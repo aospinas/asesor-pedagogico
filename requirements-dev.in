@@ -1,0 +1,9 @@
+-c requirements.txt
+-r requirements.in
+# bandit necesita PyYAML, que aún no tiene paquete para 3.15:
+# en 3.12 se instala solo; en 3.15 se corre con: uvx --python 3.12 bandit -r app -q
+bandit; python_version < "3.15"
+ruff
+pytest
+pytest-cov
+pip-audit

@@ -1,0 +1,35 @@
+# Blueprint de Render: con este archivo Render arma el servicio solo.
+# Primera vez (la hace un humano, una sola vez): en Render → New → Blueprint →
+# escoger este repo → llenar las variables marcadas con sync: false.
+# Después, cada merge a main se despliega solo.
+services:
+  - type: web
+    name: asesor-pedagogico
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /salud
+    autoDeploy: true
+    envVars:
+      - key: LLM_PROVIDER
+        value: openai
+      - key: LLM_BASE_URL
+        value: https://api.openai.com/v1
+      - key: LLM_MODEL
+        sync: false
+      - key: LLM_API_KEY
+        sync: false
+      - key: DATABASE_URL
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_KEY
+        sync: false
+      - key: SUPABASE_BUCKET
+        value: evidencias
+      - key: JWT_SECRETO
+        generateValue: true
+      - key: ORIGENES_PERMITIDOS
+        sync: false
+      - key: SANDBOX_MODE
+        value: proceso

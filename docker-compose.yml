@@ -1,0 +1,25 @@
+# Base de datos para desarrollo en el PC (no se usa en Render: allá va Supabase).
+# Arranca con:  docker compose up -d db
+# Y en .env:    DATABASE_URL=postgresql+psycopg://asesor:asesor_local@localhost:5432/asesor
+#
+# La app se corre con uvicorn desde el .venv, no dentro de un contenedor, para que
+# el sandbox en modo docker use el Docker del PC sin montar el socket de Docker
+# dentro de otro contenedor (eso le daría a la app control total del PC).
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: asesor
+      POSTGRES_PASSWORD: asesor_local
+      POSTGRES_DB: asesor
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U asesor -d asesor"]
+      interval: 5s
+      retries: 10
+
+volumes:
+  pgdata:
