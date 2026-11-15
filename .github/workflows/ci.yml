@@ -1,0 +1,87 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  pruebas:
+    name: Pruebas (Python ${{ matrix.python }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # 3.15 es la principal; 3.12 es el plan B
+        python: ["3.15", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+          allow-prereleases: true
+
+      - name: Instalar dependencias
+        run: pip install -r requirements-dev.txt
+
+      - name: Ruff (estilo y reglas de seguridad)
+        run: |
+          ruff check .
+          ruff format --check .
+
+      - name: Pruebas
+        run: pytest -q --cov=app --cov-report=term-missing
+
+      - name: Dependencias con vulnerabilidades conocidas (OWASP A03)
+        run: pip-audit -r requirements.txt
+
+      - name: Bandit (OWASP)
+        # bandit solo se instala en 3.12 (en 3.15 le falta PyYAML)
+        if: matrix.python == '3.12'
+        run: bandit -r app -q
+
+  docker:
+    name: Imagen Docker (la misma que usa Render)
+    runs-on: ubuntu-latest
+    needs: pruebas
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Construir la imagen
+        run: docker build -t asesor:ci .
+
+      - name: Arrancar y probar /salud
+        run: |
+          docker run -d --name asesor -p 8000:8000 -e PORT=8000 asesor:ci
+          for i in $(seq 1 20); do
+            if curl -fsS http://localhost:8000/salud; then echo; echo "La imagen arranca bien"; exit 0; fi
+            sleep 2
+          done
+          echo "La imagen no respondió en /salud"; docker logs asesor; exit 1
+
+  frontend:
+    name: Frontend
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: ¿Ya existe el frontend?
+        id: hay
+        run: |
+          if [ -f frontend/package.json ]; then echo "si=true" >> "$GITHUB_OUTPUT"; else echo "si=false" >> "$GITHUB_OUTPUT"; echo "Aún no hay frontend (se crea después de la Puerta 0)"; fi
+
+      - uses: actions/setup-node@v4
+        if: steps.hay.outputs.si == 'true'
+        with:
+          node-version: "22"
+
+      - name: Instalar, auditar y construir
+        if: steps.hay.outputs.si == 'true'
+        working-directory: frontend
+        run: |
+          npm ci
+          npm audit --omit=dev
+          npm run build

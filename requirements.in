@@ -1,0 +1,20 @@
+# Dependencias de la app (las versiones exactas salen en requirements.txt)
+# uvicorn va SIN [standard]: ese extra trae PyYAML, que aún no tiene paquete para Python 3.15
+fastapi
+uvicorn
+pydantic>=2.14
+pydantic-settings
+sqlalchemy
+psycopg[binary]
+alembic
+python-multipart
+bcrypt
+pyjwt
+openai
+pymupdf
+python-pptx
+rapidfuzz
+weasyprint
+jinja2
+httpx
+slowapi

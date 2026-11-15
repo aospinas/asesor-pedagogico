@@ -1,0 +1,28 @@
+[project]
+name = "asesor-pedagogico"
+version = "0.1.0"
+description = "Plataforma que evalúa laboratorios de IA: la IA propone, el backend calcula, el docente aprueba."
+requires-python = ">=3.12"
+authors = [
+  { name = "Andrés Ospina Silva" },
+  { name = "Santiago Arias Aguirre" },
+]
+
+[tool.ruff]
+line-length = 110
+target-version = "py312"
+extend-exclude = ["docs", "frontend"]
+
+[tool.ruff.lint]
+# E/F: errores, I: orden de imports, B: bugs comunes, UP: Python moderno,
+# S: reglas de seguridad tipo bandit (OWASP), SIM: código más simple
+select = ["E", "F", "I", "B", "UP", "S", "SIM"]
+
+[tool.ruff.lint.per-file-ignores]
+# En pruebas se permiten assert y subprocess controlado
+"tests/**" = ["S101", "S603"]
+".claude/hooks/**" = ["S"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]

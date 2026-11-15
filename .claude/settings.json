@@ -1,0 +1,33 @@
+{
+  "model": "claude-opus-5-5",
+  "permissions": {
+    "deny": [
+      "Read(./.env)",
+      "Read(./.env.local)",
+      "Read(./.env.production)",
+      "Edit(./.env)",
+      "Write(./.env)"
+    ],
+    "ask": [
+      "Bash(git merge:*)"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash|Read|Edit|Write|MultiEdit",
+        "hooks": [
+          { "type": "command", "command": "python .claude/hooks/guardia.py" }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          { "type": "command", "command": "ruff check --fix --quiet . ; ruff format --quiet ." }
+        ]
+      }
+    ]
+  }
+}
