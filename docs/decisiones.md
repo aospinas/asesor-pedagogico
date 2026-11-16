@@ -93,3 +93,41 @@ Salieron de los dos revisores en la Puerta 2 del módulo contrato.
 | entregas | Modelos `LaboratorioEditar` y `Rubrica`; que el estudiante llegue desde su entrega a la evaluación publicada |
 | revision | Que el docente pueda editar la justificación; publicar solo citas encontradas; decidir si el administrador ve la traza |
 | proyecto | Modelo `IntegranteEquipo` sin correo para la página pública |
+
+## D-14 · Cómo funciona el login (16-nov-2026)
+
+Decisiones del módulo auth, aprobadas en su Puerta 1.
+
+- **Sesión:** JWT en una cookie `httpOnly`, `SameSite=Lax`, de 8 horas (`SESION_MINUTOS`); en producción solo viaja por HTTPS. El rol se lee de la base en cada petición, nunca del navegador.
+- **Primer administrador:** se crea con `python -m app.crear_admin`, que pide los datos por teclado. No hay claves en el repo.
+- **Clave temporal:** la contraseña que pone el administrador es temporal; el usuario debe cambiarla al entrar antes de usar otra ruta. Al cambiarla se cierran sus otras sesiones.
+- **Bloqueo:** 5 intentos fallidos bloquean la cuenta 5 minutos (dos columnas en `usuarios`), y hay un tope de 30 intentos de inicio de sesión por minuto por IP. **Limitación:** detrás del proxy de Render todos los usuarios pueden verse con la misma IP; se revisa en el primer despliegue.
+- **Control de acceso:** cada ruta se registra con `app.api.seguridad.ruta`, que toma los roles de `app/api/rutas.py`. Una ruta que no esté en la tabla no deja arrancar la app.
+- **Pruebas:** corren en SQLite en memoria (el CI no tiene PostgreSQL). Antes de cada PR que toque la base se corren también contra PostgreSQL con `PRUEBAS_DATABASE_URL`.
+- **Migraciones:** Alembic en `migraciones/`. El contenedor corre `alembic upgrade head` al arrancar si existe `DATABASE_URL`.
+- **Base local:** la dirección usa `127.0.0.1` y no `localhost`; en Windows `localhost` tardaba 30 segundos por conexión.
+- **Cambia el SRS:** la tabla `usuarios` tiene cuatro columnas más que la sección 8 (`debe_cambiar_contrasena`, `intentos_fallidos`, `bloqueado_hasta`, `version_sesion`).
+
+## D-15 · Arreglos de la revisión del login (16-nov-2026)
+
+Salieron de los dos revisores en la Puerta 2 del módulo auth. Corrigen o precisan D-14.
+
+- **Bloqueo por correo e IP (reemplaza las dos columnas de D-14):** los intentos se cuentan en la tabla `intentos_sesion`, por correo e IP, exista o no el correo. El intento se anota antes de revisar la clave y con la fila bloqueada en la base. Por qué: el revisor probó que con peticiones simultáneas se saltaba el tope; además así nadie le bloquea la cuenta a otro desde otra IP y la respuesta no revela qué correos existen.
+- **Cerrar sesión invalida el token:** sube `version_sesion`, así que un token copiado deja de servir. Costo aceptado: se cierran también las sesiones de ese usuario en otros equipos. Desactivar a un usuario hace lo mismo.
+- **Cambiar la contraseña tiene tope:** adivinar la clave actual usa el mismo contador; al quinto fallo se cierra la sesión.
+- **Contraseña olvidada o cuenta bloqueada:** el administrador pone una clave temporal en `POST /api/usuarios/{usuario_id}/clave-temporal`. El usuario debe cambiarla al entrar; queda en la auditoría sin la clave. No hay recuperación por correo.
+- **Siempre queda un administrador activo:** no se puede quitar el rol ni desactivar al último.
+- **`ENTORNO` es una lista cerrada:** un valor mal escrito no deja arrancar. En producción `ORIGENES_PERMITIDOS` debe ser https y sin `*`.
+- **Peticiones desde otro sitio:** las que cambian datos solo se aceptan si su origen está en `ORIGENES_PERMITIDOS`. En Render esa variable debe llevar la dirección https de la app.
+- **Cookie:** en producción se llama `__Host-sesion`.
+- **Auditoría:** también se registran los intentos con correos que no existen, los bloqueos y los accesos denegados por rol. El filtro de secretos usa nombres exactos.
+- **Mensajes:** los errores de validación, el 404 y el 405 salen en español (`app/mensajes.py`).
+- **Cambia el SRS:** hay una tabla más que en la sección 8 (`intentos_sesion`); `usuarios` suma `debe_cambiar_contrasena` y `version_sesion`; la columna `detalle_json` de `auditoria` se llama `detalle`.
+
+**Queda para el primer despliegue en Render (`/desplegar`):**
+
+| Pendiente | Por qué espera |
+| --- | --- |
+| Arrancar uvicorn con `--proxy-headers` limitado al proxy de Render | Sin eso, la IP del límite, del bloqueo y de la auditoría es la del proxy y todos comparten un solo cupo. Hay que ver en Render qué IP llega |
+| Qué pasa si Supabase está dormido al arrancar | `alembic upgrade head` fallaría y el contenedor no sube. Opciones: reintentar unas veces o migrar como paso aparte |
+| Cuenta de base de datos sin permiso de crear tablas para la app | Hoy la app usa la misma cuenta de las migraciones |

@@ -18,10 +18,14 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY app ./app
 COPY prompts ./prompts
+COPY alembic.ini .
+COPY migraciones ./migraciones
 
 USER app
 ENV PYTHONUNBUFFERED=1 PORT=8000
 EXPOSE 8000
 
-# Render entrega el puerto en la variable PORT
-CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT}"]
+# Render entrega el puerto en la variable PORT.
+# Si hay base de datos configurada, primero se aplican las migraciones pendientes;
+# si una migración falla, la app no arranca (mejor eso que arrancar con tablas viejas).
+CMD ["sh", "-c", "{ [ -z \"$DATABASE_URL\" ] || alembic upgrade head; } && exec uvicorn app.main:app --host 0.0.0.0 --port ${PORT}"]

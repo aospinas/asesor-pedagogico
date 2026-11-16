@@ -8,6 +8,8 @@ si la ruta, el rol o los requisitos no coinciden.
 - **Pública:** se puede usar sin iniciar sesión.
 - **Solo lo suyo:** el estudiante entra únicamente si el recurso es de él; el
   backend lo revisa en cada consulta.
+- **Ya publicado:** al estudiante solo se le muestra lo que sale de evaluaciones
+  que el docente ya publicó.
 - Nadie puede borrar evaluaciones ni rúbricas, y ninguna ruta recibe una nota:
   la nota siempre la calcula `app/evaluador/nota.py`.
 
@@ -23,6 +25,7 @@ si la ruta, el rol o los requisitos no coinciden.
 | `GET /api/usuarios` | Listar usuarios | Administrador | RF-02 |
 | `POST /api/usuarios` | Crear un usuario | Administrador | RF-01, RF-02 |
 | `PATCH /api/usuarios/{usuario_id}` | Editar, desactivar o cambiar el rol | Administrador | RF-02 |
+| `POST /api/usuarios/{usuario_id}/clave-temporal` | Poner una clave temporal a quien olvidó la suya o quedó bloqueado | Administrador | RF-02 |
 | `GET /api/estudiantes` | Listar estudiantes para abrir su portafolio o informe | Docente | RF-08 |
 | `GET /api/cohortes` | Listar cohortes | Cualquiera con sesión | RF-03 |
 | `POST /api/cohortes` | Crear una cohorte | Docente | RF-03 |
@@ -48,10 +51,10 @@ si la ruta, el rol o los requisitos no coinciden.
 | `POST /api/evaluaciones/{evaluacion_id}/aprobar` | Aprobar la evaluación | Docente | RF-14 |
 | `POST /api/evaluaciones/{evaluacion_id}/publicar` | Publicar la evaluación | Docente | RF-14 |
 | `GET /api/evaluaciones/{evaluacion_id}/traza` | Ver la traza | Docente, Administrador | RF-15, RNF-08 |
-| `GET /api/evaluaciones/{evaluacion_id}/publicada` | Ver la evaluación ya publicada | Estudiante (solo lo suyo), Docente | RNF-09 |
-| `GET /api/informe/{estudiante_id}` | Ver el informe integrado | Estudiante (solo lo suyo), Docente | RF-16 |
-| `GET /api/informe/{estudiante_id}/pdf` | Descargar el informe en PDF | Estudiante (solo lo suyo), Docente | RF-16 |
-| `GET /api/mapa/{estudiante_id}` | Ver el mapa mental | Estudiante (solo lo suyo), Docente | RF-17 |
+| `GET /api/evaluaciones/{evaluacion_id}/publicada` | Ver la evaluación ya publicada | Estudiante (solo lo suyo y ya publicado), Docente | RNF-09 |
+| `GET /api/informe/{estudiante_id}` | Ver el informe integrado | Estudiante (solo lo suyo y ya publicado), Docente | RF-16 |
+| `GET /api/informe/{estudiante_id}/pdf` | Descargar el informe en PDF | Estudiante (solo lo suyo y ya publicado), Docente | RF-16 |
+| `GET /api/mapa/{estudiante_id}` | Ver el mapa mental | Estudiante (solo lo suyo y ya publicado), Docente | RF-17 |
 | `GET /api/config-ia` | Ver el proveedor y el modelo de IA | Administrador | RF-19 |
 | `PUT /api/config-ia` | Cambiar el proveedor y el modelo de IA | Administrador | RF-19 |
 | `POST /api/config-ia/probar` | Probar la conexión con la IA | Administrador | RF-19 |

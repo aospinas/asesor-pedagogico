@@ -11,6 +11,8 @@ services:
     healthCheckPath: /salud
     autoDeploy: true
     envVars:
+      - key: ENTORNO
+        value: produccion
       - key: LLM_PROVIDER
         value: openai
       - key: LLM_BASE_URL
