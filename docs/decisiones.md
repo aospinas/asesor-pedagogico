@@ -56,3 +56,40 @@ Una entrada por decisión: qué se decidió, por qué y qué se descartó.
 - **Por qué:** el merge del PR es la puerta humana final antes de producción, y queda registrada en GitHub como evidencia de la supervisión.
 - **Cómo se hace cumplir:** el guardrail bloquea push a `main`, `gh pr merge` y merges locales de ramas.
 - **Quién desarrolla:** todo el desarrollo lo lleva Andrés con Claude Code; Santiago Arias Aguirre figura como integrante del equipo.
+
+## D-10 · La documentación de la API queda cerrada para todos (15-nov-2026)
+
+- **Decisión:** `/docs` y `/redoc` de FastAPI quedan apagados para todos los roles. La lista de rutas se lee en `docs/api.md`.
+- **Por qué:** el SRS (A02) decía "`/docs` solo para admin", pero cerrarla del todo es más simple y más seguro, y así ya estaban `app/main.py` y la lista OWASP.
+
+## D-11 · Un solo nombre por estado de evaluación (15-nov-2026)
+
+- **Decisión:** los estados son cinco y viven en `EstadoEvaluacion` de `app/esquemas.py`: en proceso, en revisión, revisión manual, aprobada y publicada.
+- **Por qué:** el SRS usaba "Pendiente de revisión" y "En revisión" para lo mismo, y "Requiere revisión manual" y "Revisión manual" para lo mismo. Queda el nombre del diagrama de la sección 6.
+
+## D-12 · Contrato de datos y tabla de rutas con rol (15-nov-2026)
+
+- **Decisión:** `app/api/rutas.py` es la fuente única de qué rol usa cada ruta; `docs/api.md` es la misma tabla para leer y una prueba falla si no coinciden.
+- **Usuarios:** los crea el administrador (`POST /api/usuarios`); no hay registro público. RF-01 dice "registro e inicio de sesión" y aquí "registro" se entiende como el alta que hace el administrador (RF-02).
+- **Niveles ordenados (RF-05):** los valores de los niveles de un criterio deben ir de menor a mayor o de mayor a menor, sin repetirse.
+- **Notas:** ningún modelo de entrada (IA, docente o estudiante) tiene campo de nota; solo aparecen en modelos que arma el backend.
+
+## D-13 · Arreglos de la revisión del contrato (15-nov-2026)
+
+Salieron de los dos revisores en la Puerta 2 del módulo contrato.
+
+- **Dirección de la IA cerrada:** OpenAI y OpenRouter solo aceptan su dirección oficial; Ollama solo los equipos de la variable `OLLAMA_HOSTS_PERMITIDOS`. Así nadie puede hacer que el backend mande la llave a otro servidor.
+- **Contraseñas:** máximo 72 bytes (límite de bcrypt), no se les recortan los espacios, y cada usuario cambia la suya en `PUT /api/yo/contrasena` para que el administrador no la conozca.
+- **Correo:** se guarda en minúsculas.
+- **Topes de tamaño:** textos y listas de la IA, de la rúbrica y del sandbox tienen máximo; los números no aceptan infinito.
+- **Documentación de la API:** además de `/docs` y `/redoc`, se cierra `/openapi.json`.
+- **Rutas:** `GET /api/estudiantes` para el docente y `/api/mis-entregas` en vez de `/api/entregas/mias`.
+
+**Queda para el módulo que lo toca:**
+
+| Módulo | Pendiente |
+| --- | --- |
+| auth | Marcar en la tabla de rutas las que son "solo si está publicada"; no guardar secretos en el detalle de la auditoría y tipar la IP; auditar cambios de rol |
+| entregas | Modelos `LaboratorioEditar` y `Rubrica`; que el estudiante llegue desde su entrega a la evaluación publicada |
+| revision | Que el docente pueda editar la justificación; publicar solo citas encontradas; decidir si el administrador ve la traza |
+| proyecto | Modelo `IntegranteEquipo` sin correo para la página pública |

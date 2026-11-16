@@ -9,9 +9,10 @@ Se redondea a un decimal con redondeo comercial (3,85 -> 3,9).
 
 from decimal import ROUND_HALF_UP, Decimal
 
-from app.esquemas import RubricaEstructura, validar_rubrica
+from app import esquemas
+from app.esquemas import NivelDominio, RubricaEstructura, validar_rubrica
 
-NOTA_MAXIMA = Decimal("5.0")
+NOTA_MAXIMA = Decimal(str(esquemas.NOTA_MAXIMA))
 
 
 class ErrorDeNota(ValueError):
@@ -48,12 +49,12 @@ def calcular_nota(rubrica: RubricaEstructura, niveles_elegidos: dict[str, str]) 
     return float(nota)
 
 
-def nivel_de_dominio(nota: float) -> str:
+def nivel_de_dominio(nota: float) -> NivelDominio:
     """Nivel de dominio usado en el informe y el mapa mental."""
     if nota >= 4.5:
-        return "Alto"
+        return NivelDominio.ALTO
     if nota >= 3.5:
-        return "Medio"
+        return NivelDominio.MEDIO
     if nota >= 3.0:
-        return "Básico"
-    return "Por fortalecer"
+        return NivelDominio.BASICO
+    return NivelDominio.POR_FORTALECER
