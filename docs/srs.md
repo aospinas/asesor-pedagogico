@@ -1,6 +1,6 @@
 # SRS — Asesor Pedagógico Inteligente
 
-13 de noviembre de 2026 · Andrés Ospina Silva y Santiago Arias Aguirre · Profundización I - IA, Universidad de Manizales
+13 de noviembre de 2026 · Andrés Ospina Silva, Santiago Arias Aguirre y Jerónimo Aristizabal · Profundización I - IA, Universidad de Manizales
 
 ## 1. Introducción
 
@@ -12,13 +12,13 @@ El Asesor Pedagógico Inteligente es una plataforma web que evalúa los laborato
 
 **Restricciones.**
 
-- Tiempo: un día de trabajo. Todo el desarrollo lo lleva Andrés con Claude Code; Santiago Arias Aguirre figura como integrante del equipo.
+- Tiempo: un día de trabajo. Todo el desarrollo lo lleva Andrés con Claude Code; Santiago Arias Aguirre y Jerónimo Aristizabal figuran como integrantes del equipo.
 - Costo: cero en infraestructura. El único gasto variable es la API de OpenAI que ya tiene el equipo, y cada evaluación registra cuánto consumió.
 - Desarrollo: Claude Code con Claude Mythos 5.2 en lo crítico y Claude Opus 5.5 en lo demás (sección 11), bajo supervisión humana en cada fase.
 
 **Datos de prueba.** La plataforma se prueba con los laboratorios reales que el equipo hizo en el curso: Organizador de archivos (Lab 01), Agente Python con modelo en la nube (Lab 02), Agente Python con Ollama (Lab 03), Parcial 1, CVDS Aumentado y Observatorio de IA. Así la demostración usa evidencias auténticas y no datos inventados.
 
-**Equipo.** Andrés Ospina Silva y Santiago Arias Aguirre, Ingeniería de Sistemas y Telecomunicaciones, Universidad de Manizales. Docente: Carlos Betancourt.
+**Equipo.** Andrés Ospina Silva, Santiago Arias Aguirre y Jerónimo Aristizabal, Ingeniería de Sistemas y Telecomunicaciones, Universidad de Manizales. Docente: Carlos Betancourt.
 
 ## 2. Actores y roles
 
