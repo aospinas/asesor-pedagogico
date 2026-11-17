@@ -6,7 +6,7 @@ publicada: se crea la siguiente (`_v2`) y cada evaluación guarda cuál usó.
 | Archivo | Para qué | Estado |
 | --- | --- | --- |
 | `evaluar_criterio_v1.md` | Proponer el nivel de un criterio con evidencias | Por crear en el módulo evaluador |
-| `interpretar_rubrica_v1.md` | Convertir una rúbrica en PDF o Word a `RubricaEstructura` | Por crear en el módulo rúbricas |
+| `interpretar_rubrica_v1.md` | Convertir una rúbrica en PDF o Word a `RubricaEstructura` | Publicado (módulo rúbricas). El texto va en `<rubrica>...</rubrica>` |
 | `plan_fortalecimiento_v1.md` | Redactar el plan a partir de datos ya calculados | Por crear en el módulo informes |
 
 Reglas para todos los prompts:

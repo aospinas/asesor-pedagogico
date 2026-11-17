@@ -4,6 +4,7 @@ Las variables se fijan ANTES de importar la app para que las pruebas nunca
 usen el .env del PC ni la base de datos real: corren en SQLite en memoria.
 """
 
+import json
 import os
 
 os.environ.update(
@@ -13,9 +14,15 @@ os.environ.update(
     BCRYPT_RONDAS="4",
     ORIGENES_PERMITIDOS="http://localhost:5173",
     SESION_MINUTOS="480",
+    # Sin modelo: si alguna prueba llegara a la IA real, falla en vez de gastar tokens.
+    LLM_PROVIDER="openai",
+    LLM_MODEL="",
+    LLM_API_KEY="",
+    LLM_BASE_URL="https://api.openai.com/v1",
 )
 
 import pytest  # noqa: E402
+from datos_prueba import rubrica_de_prueba as _rubrica_de_prueba  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 from sqlalchemy import create_engine  # noqa: E402
 from sqlalchemy.orm import Session  # noqa: E402
@@ -119,3 +126,55 @@ def entrar(nuevo_cliente, crear_usuario):
         return cliente
 
     return _entrar
+
+
+# ---------- Laboratorios y rúbricas ----------
+
+
+@pytest.fixture
+def rubrica_de_prueba():
+    """Devuelve la función que arma una rúbrica de prueba."""
+    return _rubrica_de_prueba
+
+
+@pytest.fixture
+def laboratorio(db):
+    """Una cohorte con un laboratorio, creados directo en la base."""
+    from app.modelos import Cohorte, Laboratorio
+
+    cohorte = Cohorte(nombre="Cohorte 1", periodo="2026-2")
+    db.add(cohorte)
+    db.flush()
+    lab = Laboratorio(
+        cohorte_id=cohorte.id,
+        titulo="Laboratorio 1",
+        descripcion="Agentes con herramientas",
+        objetivos="Construir un agente",
+        temas_ia=["agentes"],
+    )
+    db.add(lab)
+    db.commit()
+    return lab
+
+
+@pytest.fixture
+def ia_simulada(motor):
+    """Reemplaza la IA: devuelve lo que la prueba ponga en `respuesta` y guarda lo que se le pidió."""
+    from app.api import rubricas
+    from app.ia.cliente import Uso, validar_respuesta
+
+    class IASimulada:
+        def __init__(self):
+            self.respuesta: dict | str | Exception = _rubrica_de_prueba()
+            self.pedidos: list[dict] = []
+
+        def __call__(self, sistema, usuario, esquema):
+            self.pedidos.append({"sistema": sistema, "usuario": usuario})
+            if isinstance(self.respuesta, Exception):
+                raise self.respuesta
+            texto = self.respuesta if isinstance(self.respuesta, str) else json.dumps(self.respuesta)
+            return validar_respuesta(texto, esquema), Uso(modelo="simulado", entrada=100, salida=50)
+
+    simulada = IASimulada()
+    app.dependency_overrides[rubricas.obtener_ia] = lambda: simulada
+    return simulada

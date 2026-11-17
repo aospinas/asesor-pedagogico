@@ -54,8 +54,8 @@ Claude Code: `/plugin install frontend-design@claude-plugins-official` y luego
 | 2 | Login, roles, usuarios y auditoría | Mythos 5.2 | `/modulo auth` |
 | 3 | Primer despliegue en Render | Mythos 5.2 | `/desplegar` |
 | 4 | Diseño en Claude Design | Opus 5.5 | `/disenar todo` |
-| 5 | Rúbricas | Opus 5.5 | `/modulo rubricas` |
-| 6 | Cohortes, laboratorios, entregas y portafolio | Opus 5.5 | `/modulo entregas` |
+| 5 | Cohortes, laboratorios y rúbricas | Opus 5.5 | `/modulo rubricas` |
+| 6 | Entregas y portafolio | Opus 5.5 | `/modulo entregas` |
 | 7 | Evaluador | Mythos 5.2 | `/modulo evaluador` |
 | 8 | Sandbox | Mythos 5.2 | `/modulo sandbox` |
 | 9 | Revisión docente | Opus 5.5 | `/modulo revision` |

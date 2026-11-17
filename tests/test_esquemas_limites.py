@@ -326,6 +326,7 @@ def test_version_de_rubrica_guarda_numero_y_errores():
         },
         "valida": False,
         "errores": ["Los pesos suman 90 %, deben sumar 100 %."],
+        "origen": "editor",
         "creada_por": str(uuid4()),
         "fecha": AHORA,
     }

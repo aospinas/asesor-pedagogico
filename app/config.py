@@ -4,7 +4,7 @@ import secrets
 from functools import lru_cache
 from typing import Literal, Self
 
-from pydantic import Field, model_validator
+from pydantic import Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 SECRETO_MINIMO = 32
@@ -21,6 +21,13 @@ class Ajustes(BaseSettings):
     origenes_permitidos: str = "http://localhost:5173"
     sesion_minutos: int = Field(default=480, ge=5, le=1440)
     bcrypt_rondas: int = Field(default=12, ge=4, le=15)
+
+    # IA (RF-19). La llave es SecretStr para que no salga si alguien imprime los ajustes.
+    llm_provider: str = "openai"
+    llm_model: str = ""
+    llm_base_url: str = "https://api.openai.com/v1"
+    llm_api_key: SecretStr = SecretStr("")
+    llm_tiempo_seg: int = Field(default=60, ge=5, le=300)
 
     @property
     def en_produccion(self) -> bool:

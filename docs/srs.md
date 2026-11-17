@@ -232,8 +232,8 @@ Trece tablas en PostgreSQL. Las rúbricas y las evaluaciones nunca se sobrescrib
 | `usuarios` | id, nombre, correo, hash\_contrasena, rol, activo, foto\_url | Login, roles y la página del equipo |
 | `cohortes` | id, nombre (Cohorte 1, Cohorte 2), periodo | Agrupar laboratorios |
 | `laboratorios` | id, cohorte\_id, titulo, descripcion, objetivos, temas\_ia | Los 3 elementos base del enunciado (F1) |
-| `rubricas` | id, laboratorio\_id, version\_vigente\_id | Una rúbrica por laboratorio |
-| `rubrica_versiones` | id, rubrica\_id, numero, estructura\_json, valida, errores\_json, creada\_por, fecha | Versiones inmutables con competencias, criterios, niveles y pesos |
+| `rubricas` | id, laboratorio\_id | Una rúbrica por laboratorio; la versión vigente es la de número más alto (D-16) |
+| `rubrica_versiones` | id, rubrica\_id, numero, estructura, valida, errores, origen, archivo\_sha256, prompt\_version, modelo, tokens\_entrada, tokens\_salida, creada\_por, fecha | Versiones inmutables con competencias, criterios, niveles y pesos. Las que convierte la IA quedan por confirmar hasta que el docente las guarda (D-16) |
 | `entregas` | id, estudiante\_id, laboratorio\_id, rubrica\_version\_id, fecha | La entrega queda amarrada a la versión de rúbrica (F2) |
 | `evidencias` | id, entrega\_id, tipo (pdf, codigo, imagen, diapositivas, video), nombre, sha256, ruta\_storage, texto\_extraido | Archivos y su huella digital |
 | `evaluaciones` | id, entrega\_id, rubrica\_version\_id, proveedor, modelo, version\_prompt, estado, nota\_preliminar, nota\_final, tokens\_entrada, tokens\_salida, costo\_usd, alerta\_inyeccion, fecha | La traza principal (C6) |
@@ -510,8 +510,8 @@ Todo el desarrollo lo lleva Andrés con Claude Code. Este es el orden de los mó
 | 2 | Login, roles, usuarios y auditoría | Mythos 5.2 | RF-01, RF-02 | `/modulo auth` |
 | 3 | Primer despliegue en Render | Mythos 5.2 | RNF-05 | `/desplegar` |
 | 4 | Diseño en Claude Design | Opus 5.5 | RNF-11 | `/disenar todo` |
-| 5 | Rúbricas: carga, interpretación, validación y versiones | Opus 5.5 | RF-04 a RF-06 | `/modulo rubricas` |
-| 6 | Cohortes, laboratorios, entregas y portafolio | Opus 5.5 | RF-03, RF-07 a RF-09 | `/modulo entregas` |
+| 5 | Cohortes, laboratorios y rúbricas: carga, interpretación, validación y versiones | Opus 5.5 | RF-03 a RF-06 | `/modulo rubricas` |
+| 6 | Entregas y portafolio | Opus 5.5 | RF-07 a RF-09 | `/modulo entregas` |
 | 7 | Evaluador: cliente de IA, esquemas, nota y citas | Mythos 5.2 | RF-11 a RF-13, RF-19 | `/modulo evaluador` |
 | 8 | Sandbox y verificación de código | Mythos 5.2 | RF-10 | `/modulo sandbox` |
 | 9 | Pantalla de revisión docente | Opus 5.5 | RF-14, RF-15 | `/modulo revision` |
@@ -547,9 +547,9 @@ Cada punto del enunciado tiene su requisito, el módulo donde vive y la prueba q
 
 | Enunciado | Requisitos | Módulo | Prueba | Estado |
 | --- | --- | --- | --- | --- |
-| F1 Entrada de información | RF-03, RF-07 | `app/api/laboratorios.py`, `app/api/entregas.py` | `tests/test_entregas.py`: PDF sin texto rechazado | Pendiente |
+| F1 Entrada de información | RF-03, RF-07 | `app/api/laboratorios.py`, `app/api/entregas.py` | `tests/test_laboratorios.py` (RF-03, hecho); `tests/test_entregas.py`: PDF sin texto rechazado | En curso: RF-03 hecho |
 | F2 Portafolio académico | RF-06, RF-08 | `app/api/portafolio.py` | `tests/test_portafolio.py`: entrega guarda versión de rúbrica | Pendiente |
-| F3 Gestión de rúbricas | RF-04, RF-05 | `app/rubricas/` | `tests/test_rubricas.py`: pesos que suman 90 % bloquean | Pendiente |
+| F3 Gestión de rúbricas | RF-04, RF-05 | `app/rubricas/` | `tests/test_rubricas.py`: pesos que suman 90 % bloquean | Hecho |
 | F4 Evaluación inteligente | RF-09 a RF-14 | `app/evaluador/` | `tests/test_evaluador.py` con respuesta de IA simulada | Pendiente |
 | F5 Informe integrado | RF-16 | `app/informes/` | `tests/test_informe.py`: PDF generado con 2 cohortes | Pendiente |
 | F6 Mapa mental | RF-17 | `frontend/src/mapa/`, `app/api/mapa.py` | `tests/test_mapa.py`: JSON con temas, labs y nivel | Pendiente |

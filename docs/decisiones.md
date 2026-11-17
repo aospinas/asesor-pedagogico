@@ -131,3 +131,29 @@ Salieron de los dos revisores en la Puerta 2 del módulo auth. Corrigen o precis
 | Arrancar uvicorn con `--proxy-headers` limitado al proxy de Render | Sin eso, la IP del límite, del bloqueo y de la auditoría es la del proxy y todos comparten un solo cupo. Hay que ver en Render qué IP llega |
 | Qué pasa si Supabase está dormido al arrancar | `alembic upgrade head` fallaría y el contenedor no sube. Opciones: reintentar unas veces o migrar como paso aparte |
 | Cuenta de base de datos sin permiso de crear tablas para la app | Hoy la app usa la misma cuenta de las migraciones |
+
+## D-16 · Rúbricas, cohortes y laboratorios (16-nov-2026)
+
+- **Cohortes y laboratorios se construyen en el módulo rúbricas** y no en el de entregas: la rúbrica cuelga de un laboratorio y sin ellos no se puede probar. El módulo entregas queda con entregas y portafolio.
+- **Cliente de IA mínimo antes del evaluador:** `app/ia/cliente.py` solo tiene `pedir_json` (pide un JSON y lo valida con el esquema). Lo necesita RF-04. El módulo evaluador (Mythos) lo amplía.
+- **Sin `version_vigente_id`:** la versión vigente es la de número más alto. Por qué: con esa columna las tablas `rubricas` y `rubrica_versiones` se apuntan una a la otra y SQLite no lo soporta en las migraciones. Como cada cambio crea una versión nueva, la última siempre es la vigente. **Cambia el SRS (sección 8).**
+- **`rubrica_versiones` guarda más que el SRS:** `origen` (json, pdf, docx, texto, editor), `archivo_sha256`, `prompt_version`, `modelo` y tokens. Sirve para la traza y para los costos.
+- **Carga y corrección:** `POST .../rubrica` recibe un archivo (PDF, Word, texto o JSON; el tipo se decide por el contenido). El JSON entra sin IA. `PUT .../rubrica` recibe la estructura corregida del editor. Las dos crean una versión nueva.
+- **Una rúbrica con errores se guarda** (para corregirla en el editor) pero `version_evaluable` no deja evaluar con ella (RF-05).
+- **El estudiante solo ve la última versión válida**, nunca un borrador con errores.
+- **Word sin lector de XML:** el texto del .docx se saca con expresiones regulares, así no hay entidades XML que atacar. Topes: 5 MB por archivo, 30 páginas, 10 MB descomprimido y 40.000 caracteres hacia la IA.
+- **Cohortes:** no puede haber dos con el mismo nombre y periodo.
+
+**Arreglos de la revisión (Puerta 2):**
+
+- **Lo que convierte la IA lo confirma el docente:** una versión que sale de PDF, Word o texto queda `por_confirmar`. No sirve para evaluar ni la ve el estudiante hasta que el docente la revisa y la guarda desde el editor (`PUT`), que crea una versión nueva confirmada. No hay una ruta "confirmar": así ninguna versión se modifica. La IA propone, el docente aprueba.
+- **El PDF se lee en un proceso aparte** con 15 s de tiempo y, en Linux, 400 MB de memoria. Un PDF bomba mata ese proceso y no la app. Probado con un PDF de 299 KB que se expande a 90 MB: en Linux se rechaza en 4 s.
+- **Word:** la expresión que lee el texto ya no retrocede (antes un archivo de 216 bytes podía trabar el servidor) y el tope descomprimido baja a 2 MB. Un zip cifrado o dañado da un aviso y no un error 500.
+- **Tope de 6 MB por petición** en el middleware, antes de leerla. FastAPI guarda los archivos en disco antes de revisar la sesión: sin esto, cualquiera podía llenar el disco. Si las entregas necesitan más, se sube con su propia decisión.
+- **Máximo 10 conversiones con IA por docente por hora** (se cuentan en la auditoría como `rubrica_ia_pedida`, también las fallidas). Sin reintento automático.
+- **La conexión a la base se suelta** antes de esperar a la IA.
+- **Una rúbrica de más de 40.000 caracteres se rechaza** en vez de recortarse sin avisar.
+- **Rúbricas incompletas:** el esquema acepta peso 0 y un solo nivel para que lo que convierte la IA se pueda guardar y corregir; `validar_rubrica` los marca como error. El prompt pide copiar los pesos tal cual, sin convertir puntos a porcentaje, para que un error de suma no se esconda. Se corrigió `interpretar_rubrica_v1` en vez de crear `_v2` porque nunca se había usado.
+- **El estudiante recibe solo** número, estructura y fecha de la rúbrica.
+- **Las versiones no se pueden editar ni borrar** tampoco desde el código: un evento de SQLAlchemy lo impide.
+- **A Ollama nunca se le manda la llave.** Una respuesta cortada o un JSON muy anidado de la IA se rechazan.
