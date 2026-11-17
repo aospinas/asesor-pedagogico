@@ -404,3 +404,9 @@ El módulo se hizo con **Opus 5.5**: Mythos 5.2 y Fable 5.2 no tenían créditos
 - **Se acepta:** cualquier docente revisa cualquier evaluación (el SRS no tiene cursos por docente, igual que en entregas). Una entrega puede tener varias evaluaciones publicadas; el informe (módulo siguiente) debe usar la más reciente.
 - **Cambia el SRS (sección 8):** `revisiones_docente` suma `criterio_id`; `evaluaciones` suma `prioridad`. Retroalimentación es `PATCH` (como en la tabla de rutas).
 
+**Revisión (Puerta 2):** seguridad sin hallazgos medios o altos; calidad, uno medio que se arregló:
+
+- **"Sin propuesta" mira la rúbrica, no solo las filas:** si el motor se cortó a mitad, los criterios que nunca se crearon también cuentan, y al pasar a revisión manual la evaluación queda con prioridad de al menos 1 (sube en la bandeja). Prueba nueva: el motor se corta en el segundo criterio, el docente califica a mano los que faltan y aprueba.
+- **Bajos arreglados:** la bandeja tiene su límite de 120 consultas por minuto; una cita guardada sin todos sus campos no le llega al estudiante (antes daba 500); la auditoría de la retroalimentación guarda el antes y el después.
+- **Para el frontend:** avisar al docente que la justificación de un ajuste la verá el estudiante.
+

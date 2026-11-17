@@ -79,6 +79,38 @@ def test_calificar_a_mano_lo_que_la_ia_no_pudo_la_pasa_a_revision(caso, ia_evalu
     assert "sin_propuesta" not in nueva["motivos"]
 
 
+def test_una_evaluacion_cortada_a_mitad_se_califica_a_mano_y_se_aprueba(caso, ia_evaluador, monkeypatch):
+    """El motor se corta después del primer criterio: c2 y c3 nunca se crearon. Igual cuentan
+    como "sin propuesta", la evaluación sube en la bandeja y el docente puede terminarla."""
+    from app.evaluador import motor
+
+    original = motor._proponer
+
+    def se_corta(criterio, *args):
+        if criterio.id == "c2":
+            raise RuntimeError("el servidor se cayó")
+        return original(criterio, *args)
+
+    monkeypatch.setattr(motor, "_proponer", se_corta)
+    docente, _, entrega_json = caso
+    evaluacion = evaluar(docente, entrega_json)
+    assert evaluacion["estado"] == "revision_manual"
+    assert [c["criterio_id"] for c in evaluacion["criterios"]] == ["c1"]  # c2 y c3 no existen
+    assert "sin_propuesta" in evaluacion["motivos"]
+    bandeja = docente.get("/api/evaluaciones").json()
+    assert bandeja[0]["id"] == evaluacion["id"] and "sin_propuesta" in bandeja[0]["motivos"]
+
+    # Calificar solo c2 no basta: c3 sigue sin nivel
+    nueva = ajustar(docente, evaluacion, "c2", "medio", "Lo califiqué yo.").json()
+    assert (nueva["estado"], "sin_propuesta" in nueva["motivos"]) == ("revision_manual", True)
+    assert docente.post(_url(evaluacion, "aprobar")).status_code == 409
+    nueva = ajustar(docente, evaluacion, "c3", "alto", "Lo califiqué yo.").json()
+    assert nueva["estado"] == "en_revision"
+    assert nueva["nota_preliminar"] == 4.5  # 5 × (0,4 + 0,3 × 2/3 + 0,3)
+    aprobada = docente.post(_url(evaluacion, "aprobar")).json()
+    assert (aprobada["estado"], aprobada["nota_final"]) == ("aprobada", 4.5)
+
+
 def test_la_evaluacion_que_no_existe_da_404(entrar):
     docente = entrar("docente")
     falsa = {"id": str(uuid4())}

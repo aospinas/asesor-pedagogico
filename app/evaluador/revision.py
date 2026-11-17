@@ -26,18 +26,39 @@ def nivel_efectivo(fila: EvaluacionCriterio | None) -> str | None:
 
 
 def motivos(
-    alerta_inyeccion: bool, criterios: Iterable[EvaluacionCriterio], terminada: bool
+    alerta_inyeccion: bool,
+    criterios: Iterable[EvaluacionCriterio],
+    terminada: bool,
+    ids_rubrica: Iterable[str] = (),
 ) -> list[MotivoPrioridad]:
-    """Por qué esta evaluación va primero en la bandeja (SRS sección 6)."""
+    """Por qué esta evaluación va primero en la bandeja (SRS sección 6).
+
+    "Sin propuesta" mira los criterios de la RÚBRICA (`ids_rubrica`), no solo las filas que
+    existen: si el motor se cortó a mitad, los criterios que nunca se crearon también cuentan."""
     criterios = list(criterios)
+    con_nivel = {c.criterio_id for c in criterios if nivel_efectivo(c) is not None}
+    esperados = set(ids_rubrica) | {c.criterio_id for c in criterios}
     lista = []
     if any(e.get("encontrada") is False for c in criterios for e in c.evidencias):
         lista.append(MotivoPrioridad.CITA_NO_ENCONTRADA)
     if alerta_inyeccion:
         lista.append(MotivoPrioridad.ALERTA_INYECCION)
-    if terminada and any(nivel_efectivo(c) is None for c in criterios):
+    if terminada and (esperados - con_nivel or not esperados):
         lista.append(MotivoPrioridad.SIN_PROPUESTA)
     return lista
+
+
+def ids_de_rubrica(db: Session, rubrica_version_id, cache: dict | None = None) -> list[str]:
+    """Los ids de criterio de una versión de rúbrica (con caché opcional para la bandeja)."""
+    from app.modelos import RubricaVersion
+
+    if cache is not None and rubrica_version_id in cache:
+        return cache[rubrica_version_id]
+    version = db.get(RubricaVersion, rubrica_version_id)
+    ids = [c["id"] for c in (version.estructura or {}).get("criterios", []) if isinstance(c, dict)]
+    if cache is not None:
+        cache[rubrica_version_id] = ids
+    return ids
 
 
 def filas_por_criterio(db: Session, evaluacion: Evaluacion) -> dict[str, EvaluacionCriterio]:
@@ -94,5 +115,6 @@ def recalcular(db: Session, evaluacion: Evaluacion, rubrica: RubricaEstructura) 
     if evaluacion.estado == EstadoEvaluacion.REVISION_MANUAL.value and nota is not None:
         evaluacion.estado = EstadoEvaluacion.EN_REVISION.value
     filas = filas_por_criterio(db, evaluacion).values()
-    evaluacion.prioridad = len(motivos(evaluacion.alerta_inyeccion, filas, terminada=True))
+    ids = [c.id for c in rubrica.criterios]
+    evaluacion.prioridad = len(motivos(evaluacion.alerta_inyeccion, filas, terminada=True, ids_rubrica=ids))
     evaluacion.actualizada = ahora()

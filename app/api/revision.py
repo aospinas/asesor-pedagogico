@@ -139,7 +139,9 @@ def _retro(fila: EvaluacionCriterio) -> str:
 
 
 @ruta(router, "GET", "/api/evaluaciones", response_model=list[EvaluacionResumen])
+@limitador.limit(LIMITE_CONSULTAS, key_func=seguridad.clave_de_usuario)
 def bandeja(
+    request: Request,
     db: Db,
     estado: Annotated[EstadoEvaluacion | None, Query(description="Sin estado: las pendientes")] = None,
     laboratorio_id: uuid.UUID | None = None,
@@ -165,6 +167,7 @@ def bandeja(
         .limit(limite)
     ).all()
     ids = [f[0].id for f in filas]
+    rubricas: dict = {}  # cada versión de rúbrica se lee una sola vez por página
     criterios: dict[uuid.UUID, list[EvaluacionCriterio]] = {i: [] for i in ids}
     if ids:
         for c in db.scalars(select(EvaluacionCriterio).where(EvaluacionCriterio.evaluacion_id.in_(ids))):
@@ -177,7 +180,7 @@ def bandeja(
             estudiante_id=estudiante,
             estado=EstadoEvaluacion(ev.estado),
             nota_preliminar=ev.nota_preliminar,
-            motivos=motivos(ev, criterios[ev.id]),
+            motivos=motivos(db, ev, criterios[ev.id], rubricas),
             fecha=ev.fecha,
         )
         for ev, laboratorio, estudiante in filas
@@ -242,7 +245,7 @@ def editar_retroalimentacion(
         evaluacion,
         AccionRevision.EDITAR_RETROALIMENTACION,
         "retroalimentacion_editada",
-        {"criterio_id": criterio.id},
+        {"criterio_id": criterio.id, "anterior": json.loads(anterior), "nuevo": json.loads(_retro(fila))},
         criterio_id=criterio.id,
         anterior=anterior,
         nuevo=_retro(fila),
@@ -423,6 +426,7 @@ def ver_publicada(request: Request, evaluacion_id: uuid.UUID, actual: Actual, db
                     Cita(archivo=e["archivo"], ubicacion=e["ubicacion"], fragmento=e["fragmento"])
                     for e in f.evidencias
                     if e.get("encontrada") is True
+                    and all(e.get(k) for k in ("archivo", "ubicacion", "fragmento"))
                 ],
                 fortalezas=f.fortalezas,
                 debilidades=f.debilidades,

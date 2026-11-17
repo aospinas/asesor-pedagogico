@@ -32,7 +32,7 @@ from functools import cache
 from pathlib import Path
 
 from pydantic import BaseModel
-from sqlalchemy import select, update
+from sqlalchemy import case, select, update
 from sqlalchemy.orm import Session
 
 from app import almacen as almacenes
@@ -146,7 +146,13 @@ def _a_revision_manual(db: Session, evaluacion_id: uuid.UUID, aviso: str, motivo
     cambio = db.execute(
         update(Evaluacion)
         .where(Evaluacion.id == evaluacion_id, Evaluacion.estado == EstadoEvaluacion.EN_PROCESO.value)
-        .values(estado=EstadoEvaluacion.REVISION_MANUAL.value, aviso=aviso, actualizada=ahora())
+        .values(
+            estado=EstadoEvaluacion.REVISION_MANUAL.value,
+            aviso=aviso,
+            actualizada=ahora(),
+            # Cortada a mitad: al menos un criterio quedó sin propuesta (sube en la bandeja, D-21)
+            prioridad=case((Evaluacion.prioridad < 1, 1), else_=Evaluacion.prioridad),
+        )
     )
     if not cambio.rowcount:
         return False
@@ -547,7 +553,14 @@ def _evaluar(db: Session, evaluacion_id: uuid.UUID, contexto: Contexto) -> None:
         .values(
             estado=estado,
             # Para ordenar la bandeja del docente (D-21)
-            prioridad=len(revision.motivos(evaluacion.alerta_inyeccion, filas, terminada=True)),
+            prioridad=len(
+                revision.motivos(
+                    evaluacion.alerta_inyeccion,
+                    filas,
+                    terminada=True,
+                    ids_rubrica=[c.id for c in rubrica.criterios],
+                )
+            ),
             nota_preliminar=nota,
             aviso=" ".join(dict.fromkeys(avisos))[:300] or None,
             actualizada=ahora(),

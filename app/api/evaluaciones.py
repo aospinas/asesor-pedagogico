@@ -81,10 +81,13 @@ def obtener_config(db: Db) -> ConfigIA:
 # ---------- Respuesta ----------
 
 
-def motivos(evaluacion: EvaluacionFila, criterios: list[EvaluacionCriterio]) -> list[MotivoPrioridad]:
+def motivos(
+    db: Db, evaluacion: EvaluacionFila, criterios: list[EvaluacionCriterio], cache: dict | None = None
+) -> list[MotivoPrioridad]:
     """Por qué esta evaluación va primero en la bandeja (SRS sección 6)."""
     terminada = evaluacion.estado != EstadoEvaluacion.EN_PROCESO.value
-    return revision.motivos(evaluacion.alerta_inyeccion, criterios, terminada)
+    ids = revision.ids_de_rubrica(db, evaluacion.rubrica_version_id, cache) if terminada else []
+    return revision.motivos(evaluacion.alerta_inyeccion, criterios, terminada, ids)
 
 
 def verificaciones_de(db: Db, evaluacion: EvaluacionFila) -> list[VerificacionCodigo]:
@@ -145,7 +148,7 @@ def a_esquema(db: Db, evaluacion: EvaluacionFila) -> Evaluacion:
         aprobada_por=evaluacion.aprobada_por,
         fecha_aprobacion=evaluacion.fecha_aprobacion,
         fecha_publicacion=evaluacion.fecha_publicacion,
-        motivos=motivos(evaluacion, criterios),
+        motivos=motivos(db, evaluacion, criterios),
         aviso=evaluacion.aviso,
     )
 
