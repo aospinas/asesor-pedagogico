@@ -556,7 +556,7 @@ Cada punto del enunciado tiene su requisito, el módulo donde vive y la prueba q
 | F7 Proyecto y equipo | RF-18 | `frontend/src/paginas/Proyecto.tsx` | Revisión manual | Pendiente |
 | C1 Uso intensivo de IA | RF-22, RNF-13 | `docs/bitacora-ia.md` | Bitácora con una entrada por módulo | Pendiente |
 | C2 Evaluación estructurada | RNF-01, RNF-02 | `app/esquemas.py`, `app/evaluador/nota.py` | `tests/test_nota.py`: 5 casos de la fórmula | Pendiente |
-| C3 Verificación del código | RF-10, RNF-03 | `app/sandbox/` | `tests/test_sandbox.py`: red, ciclo infinito, memoria, entorno | Pendiente |
+| C3 Verificación del código | RF-10, RNF-03 | `app/sandbox/` | `tests/test_sandbox.py`: red, ciclo infinito, memoria, entorno | Hecho |
 | C4 Modelos configurables | RF-19, RNF-04 | `app/ia/cliente.py` | `tests/test_cliente_ia.py` con los 3 proveedores simulados | Pendiente |
 | C5 Despliegue y calidad | RF-01, RF-02, RNF-05 a RNF-07, RNF-10 a RNF-12 | `Dockerfile`, `.github/workflows/ci.yml` | `tests/test_acceso.py` + CI en verde + URL pública | Pendiente |
 | C6 Trazabilidad y supervisión | RF-12, RF-14, RF-15, RNF-08, RNF-09 | `app/auditoria/`, pantalla de revisión | `tests/test_traza.py`: cambio de nivel queda auditado | Pendiente |
