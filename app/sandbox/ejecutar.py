@@ -11,10 +11,11 @@ equipo) y la salida se lee con tope: aunque el código imprima gigas, la app gua
 
 import contextlib
 import json
+import math
 import os
 import shutil
 import signal
-import subprocess
+import subprocess  # nosec B404
 import sys
 import tempfile
 import threading
@@ -31,6 +32,8 @@ CPU_SEG = 30
 ARCHIVO_BYTES = 10 * 1024 * 1024
 CPUS_DOCKER = "0.5"
 USUARIO_DOCKER = "10001:10001"
+ETIQUETA_DOCKER = "asesor-sandbox=1"  # para encontrarlos: docker ps --filter label=asesor-sandbox
+MARGEN_TIMEOUT_SEG = 5
 # Variables que el cliente de Docker necesita para hablar con Docker Desktop o el servicio.
 # Ninguna lleva secretos de la app; las demás no se le pasan.
 VARIABLES_DOCKER = (
@@ -75,7 +78,7 @@ def _lanzador() -> str:
 def _correr(comando: list[str], entrada: bytes, tiempo_seg: float, al_vencer, **opciones) -> Corrida:
     """Corre el comando con la entrada dada, lee la salida con tope y lo corta al vencer el tiempo."""
     inicio = time.monotonic()
-    proceso = subprocess.Popen(  # noqa: S603 (comando armado por el backend, sin shell)
+    proceso = subprocess.Popen(  # noqa: S603 (comando armado por el backend, sin shell)  # nosec B603
         comando, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, **opciones
     )
     leido = bytearray()
@@ -135,13 +138,18 @@ def _datos(tarea: str, archivos: list[dict], carpeta: str | None, memoria_mb: in
 # ---------- Modo docker ----------
 
 
-def comando_docker(nombre: str, imagen: str, memoria_mb: int, codigo: str) -> list[str]:
-    """El `docker run` con todos los límites. Se prueba aparte para que nadie quite uno sin ver."""
+def comando_docker(nombre: str, imagen: str, memoria_mb: int, codigo: str, tiempo_seg: float) -> list[str]:
+    """El `docker run` con todos los límites. Se prueba aparte para que nadie quite uno sin ver.
+
+    Adentro, `timeout -s KILL` mata al lanzador aunque falle el `docker kill` de la app:
+    así no quedan contenedores vivos ocupando memoria."""
     return [
         "docker",
         "run",
         "--rm",
         "-i",
+        "--label",
+        ETIQUETA_DOCKER,
         "--pull",
         "never",  # nunca se baja una imagen de internet en medio de una evaluación
         "--name",
@@ -158,7 +166,7 @@ def comando_docker(nombre: str, imagen: str, memoria_mb: int, codigo: str) -> li
         str(PROCESOS),
         "--read-only",
         "--tmpfs",
-        f"/tmp:rw,noexec,nosuid,nodev,size={ARCHIVO_BYTES // (1024 * 1024)}m",  # noqa: S108 (/tmp del contenedor)
+        f"/tmp:rw,noexec,nosuid,nodev,size={ARCHIVO_BYTES // (1024 * 1024)}m",  # noqa: S108 (/tmp del contenedor)  # nosec B108
         "--cap-drop",
         "ALL",
         "--security-opt",
@@ -168,8 +176,12 @@ def comando_docker(nombre: str, imagen: str, memoria_mb: int, codigo: str) -> li
         "--ulimit",
         "core=0",
         "--workdir",
-        "/tmp",  # noqa: S108 (/tmp del contenedor, un tmpfs desechable)
+        "/tmp",  # noqa: S108 (/tmp del contenedor, un tmpfs desechable)  # nosec B108
         imagen,
+        "timeout",
+        "-s",
+        "KILL",
+        str(math.ceil(tiempo_seg) + MARGEN_TIMEOUT_SEG),
         "python",
         "-I",
         "-B",
@@ -182,14 +194,14 @@ def _entorno_docker() -> dict[str, str]:
     return {k: v for k, v in os.environ.items() if k.upper() in VARIABLES_DOCKER}
 
 
-def revisar_docker(imagen: str) -> None:
+def revisar_docker(imagen: str, tiempo_seg: float = 20) -> None:
     """Lanza SandboxNoDisponible con un aviso claro si Docker no corre o falta la imagen."""
     try:
-        hecho = subprocess.run(  # noqa: S603
+        hecho = subprocess.run(  # noqa: S603 (docker con argumentos fijos, sin shell)  # nosec B603 B607
             ["docker", "image", "inspect", "--format", "{{.Id}}", imagen],  # noqa: S607
             capture_output=True,
             text=True,
-            timeout=20,
+            timeout=tiempo_seg,
             env=_entorno_docker(),
             check=False,
         )
@@ -215,7 +227,7 @@ def correr_docker(
 
     def matar(_proceso) -> None:
         with contextlib.suppress(OSError, subprocess.TimeoutExpired):
-            subprocess.run(  # noqa: S603
+            subprocess.run(  # noqa: S603 (docker con argumentos fijos, sin shell)  # nosec B603 B607
                 ["docker", "kill", nombre],  # noqa: S607
                 capture_output=True,
                 timeout=20,
@@ -223,7 +235,7 @@ def correr_docker(
                 check=False,
             )
 
-    comando = comando_docker(nombre, imagen, memoria_mb, _lanzador())
+    comando = comando_docker(nombre, imagen, memoria_mb, _lanzador(), tiempo_seg)
     return _correr(comando, _datos(tarea, archivos, None, memoria_mb), tiempo_seg, matar, env=entorno)
 
 
@@ -279,9 +291,12 @@ def correr_proceso(tarea: str, archivos: list[dict], tiempo_seg: float, memoria_
 
 
 def _borrar(carpeta: str) -> None:
-    """Borra la carpeta aunque el código del estudiante le haya quitado permisos a algo."""
+    """Borra la carpeta aunque el código del estudiante le haya quitado permisos a algo.
+    Los enlaces simbólicos no se siguen: chmod cambiaría los permisos de su destino."""
     for raiz, carpetas, _ in os.walk(carpeta):
         for nombre in carpetas:
-            with contextlib.suppress(OSError):
-                os.chmod(os.path.join(raiz, nombre), 0o700)
+            ruta = os.path.join(raiz, nombre)
+            if not os.path.islink(ruta):
+                with contextlib.suppress(OSError):
+                    os.chmod(ruta, 0o700)
     shutil.rmtree(carpeta, ignore_errors=True)

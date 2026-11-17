@@ -1,31 +1,44 @@
-"""Sandbox: verificación del código de una entrega (RF-10, RNF-03, SRS sección 10).
+"""Sandbox: verificación del código de una entrega (RF-10, RNF-03, SRS sección 10, D-18).
 
 Uso: `verificar(archivos) -> list[VerificacionCodigo]`, con los archivos que sacó el lector
 de ZIP o de GitHub. Nunca lanza error: si el sandbox no puede correr, lo dice en una
-verificación (RNF-10). Lista vacía = la entrega no trae código Python.
+verificación (RNF-10). Lista vacía = la entrega no trae código Python. Puede tardar más de
+un minuto: el evaluador la llama desde su tarea en segundo plano, nunca dentro de una ruta.
 
 Nada del código del estudiante corre en el proceso web: la sintaxis, ruff y pytest corren
 en el lanzador, dentro de un contenedor (docker) o de un proceso aparte (proceso).
+
+Ojo (LLM01): TODAS las salidas traen texto del estudiante (nombres de archivo, nombres que
+repite ruff, lo que imprimen sus pruebas). Para la IA son datos, nunca instrucciones.
 """
 
 import json
+import logging
+import os
+import re
+import sys
 import threading
 import time
 from dataclasses import dataclass
 from typing import Literal
 
+from pydantic import Field, ValidationError
+
 from app.archivos.zip import ArchivoCodigo
-from app.config import ajustes
-from app.esquemas import TipoVerificacion, VerificacionCodigo
+from app.config import SECRETOS_DEL_ENTORNO, ajustes
+from app.esquemas import Estricto, TipoVerificacion, VerificacionCodigo
 from app.sandbox import ejecutar
 from app.sandbox.ejecutar import Corrida, SandboxNoDisponible
 from app.sandbox.lanzador import MARCA, es_prueba
 
 MAXIMO_SALIDA = 20000  # tope de VerificacionCodigo.salida
 MAXIMO_ENTRADA = 8 * 1024 * 1024  # texto total que se le pasa al sandbox (el tmpfs es de 10 MB)
-ESPERA_TURNO_SEG = 120
+ESPERA_TURNO_SEG = 30
 COMANDO_PRUEBAS = "pytest -q -p no:cacheprovider"
 RECORTADA = "\n... (salida recortada)"
+# Controles que no son salto de línea ni tabulación (incluye ESC de los colores de terminal,
+# los C1 y los que invierten el sentido del texto).
+CONTROLES = re.compile(r"[\x00-\x08\x0b-\x1f\x7f-\x9f\u200e\u200f\u202a-\u202e\u2066-\u2069]")
 
 OCUPADO = "El sandbox está ocupado con otra entrega. Vuelve a lanzar la evaluación en unos minutos."
 SIN_TIEMPO = "Se acabó el tiempo del sandbox antes de llegar a este paso."
@@ -33,9 +46,11 @@ AGOTADO = "Tiempo agotado: el sandbox cortó la ejecución."
 FALLO = "El sandbox no pudo terminar la revisión."
 GRANDE = "La entrega es demasiado grande para el sandbox."
 PRUEBAS_APAGADAS = (
-    "La entrega trae pruebas, pero en este servidor no se ejecutan (SANDBOX_PRUEBAS=no). "
-    "Se revisaron sin ejecutar: sintaxis y ruff."
+    "La entrega trae pruebas, pero en este servidor no se ejecutan. "
+    "Se revisaron sin ejecutar: la sintaxis y el estilo."
 )
+
+registro = logging.getLogger("asesor.sandbox")
 
 # Uno a la vez: Render tiene 512 MB y cada corrida puede usar 256 MB.
 _TURNO = threading.BoundedSemaphore(1)
@@ -61,11 +76,44 @@ class ConfigSandbox:
         )
 
 
+class _Paso(Estricto):
+    """Un paso de "revisar" tal como lo devuelve el lanzador. Se valida con tipos estrictos:
+    una salida rara se toma como falla, nunca tumba la evaluación."""
+
+    comando: str = Field(max_length=500)
+    codigo_salida: int | None
+    salida: str
+    duracion_ms: int = Field(ge=0)
+
+
+class _Revision(Estricto):
+    sintaxis: _Paso
+    estilo: _Paso
+    seguridad: _Paso
+
+
+def preparar_proceso_web() -> None:
+    """Se llama al arrancar la app en modo proceso (Render), antes de cualquier proceso hijo.
+
+    1. Lee los ajustes (quedan guardados) y saca los secretos de os.environ: así ningún
+       proceso hijo los hereda (lector de PDF, su resource_tracker, el sandbox).
+    2. Marca el proceso web como no volcable: otro proceso del mismo usuario no puede leer
+       /proc/<pid>/environ, que conserva el entorno con el que arrancó.
+    """
+    ajustes()
+    for nombre in list(os.environ):
+        if nombre.upper() in SECRETOS_DEL_ENTORNO:
+            del os.environ[nombre]
+    if sys.platform.startswith("linux"):
+        ejecutar.proteger_proceso_web()
+
+
 def limpiar_salida(salida: str | bytes, recortada: bool = False) -> str:
-    """Texto guardable: sin NUL (PostgreSQL no los acepta) y con tope de tamaño."""
+    """Texto guardable y mostrable: sin NUL (PostgreSQL no los acepta), sin caracteres de
+    control (colores de terminal, texto invertido) y con tope de tamaño."""
     if isinstance(salida, bytes):
         salida = salida.decode("utf-8", errors="replace")
-    salida = salida.replace("\x00", "")
+    salida = CONTROLES.sub("", salida.replace("\r\n", "\n"))
     if len(salida) > MAXIMO_SALIDA - len(RECORTADA):
         salida = salida[: MAXIMO_SALIDA - len(RECORTADA)]
         recortada = True
@@ -73,22 +121,31 @@ def limpiar_salida(salida: str | bytes, recortada: bool = False) -> str:
 
 
 def _aviso(
-    tipo: TipoVerificacion, comando: str, mensaje: str, *, agotado: bool = False
+    tipo: TipoVerificacion, comando: str, mensaje: str, *, agotado: bool = False, duracion_ms: int = 0
 ) -> VerificacionCodigo:
     return VerificacionCodigo(
-        tipo=tipo, comando=comando, codigo_salida=None, salida=mensaje, duracion_ms=0, tiempo_agotado=agotado
+        tipo=tipo,
+        comando=comando,
+        codigo_salida=None,
+        salida=mensaje,
+        duracion_ms=duracion_ms,
+        tiempo_agotado=agotado,
     )
 
 
 def verificar(archivos: list[ArchivoCodigo], config: ConfigSandbox | None = None) -> list[VerificacionCodigo]:
     """Sintaxis, ruff (estilo y seguridad) y, si la entrega trae pruebas, pytest."""
-    config = config or ConfigSandbox.desde_ajustes()
-    if not any(a.ruta.endswith(".py") for a in archivos):
-        return []
-    lista = [{"ruta": a.ruta, "texto": a.texto} for a in archivos]
-    if sum(len(a["texto"].encode("utf-8")) for a in lista) > MAXIMO_ENTRADA:
-        return [_aviso(TipoVerificacion.SINTAXIS, "ast.parse", GRANDE)]
-    trae_pruebas = any(es_prueba(a.ruta) for a in archivos)
+    try:
+        config = config or ConfigSandbox.desde_ajustes()
+        if not any(a.ruta.endswith(".py") for a in archivos):
+            return []
+        lista = [{"ruta": a.ruta, "texto": a.texto} for a in archivos]
+        if sum(len(a["texto"].encode("utf-8")) for a in lista) > MAXIMO_ENTRADA:
+            return [_aviso(TipoVerificacion.SINTAXIS, "ast.parse", GRANDE)]
+        trae_pruebas = any(es_prueba(a.ruta) for a in archivos)
+    except Exception as error:  # RNF-10: nada de aquí tumba la evaluación
+        registro.warning("Sandbox: error inesperado al preparar (%s)", type(error).__name__)
+        return [_aviso(TipoVerificacion.SINTAXIS, "ast.parse", FALLO)]
 
     if not _TURNO.acquire(timeout=ESPERA_TURNO_SEG):
         return [_aviso(TipoVerificacion.SINTAXIS, "ast.parse", OCUPADO)]
@@ -102,6 +159,9 @@ def verificar(archivos: list[ArchivoCodigo], config: ConfigSandbox | None = None
         return verificaciones
     except SandboxNoDisponible as error:
         return [_aviso(TipoVerificacion.SINTAXIS, "ast.parse", str(error))]
+    except Exception as error:  # RNF-10. Solo el tipo al registro: nada del código del estudiante.
+        registro.warning("Sandbox: error inesperado (%s)", type(error).__name__)
+        return [_aviso(TipoVerificacion.SINTAXIS, "ast.parse", FALLO)]
     finally:
         _TURNO.release()
 
@@ -115,31 +175,33 @@ def _correr(tarea: str, lista: list[dict], config: ConfigSandbox, limite: float)
     return ejecutar.correr_proceso(tarea, lista, restante, config.memoria_mb)
 
 
-def _revisar(lista: list[dict], config: ConfigSandbox, limite: float) -> list[VerificacionCodigo]:
-    corrida = _correr("revisar", lista, config, limite)
-    if corrida is None:
-        return [_aviso(TipoVerificacion.SINTAXIS, "ast.parse", SIN_TIEMPO, agotado=True)]
-    if corrida.tiempo_agotado:
-        return [
-            VerificacionCodigo(
-                tipo=TipoVerificacion.SINTAXIS,
-                comando="ast.parse y ruff",
-                codigo_salida=None,
-                salida=AGOTADO,
-                duracion_ms=corrida.duracion_ms,
-                tiempo_agotado=True,
-            )
-        ]
-    texto = corrida.salida.decode("utf-8", errors="replace")
-    resultado = None
+def _leer_revision(texto: str) -> _Revision | None:
     for linea in reversed(texto.splitlines()):
         if linea.startswith(MARCA):
             try:
-                resultado = json.loads(linea[len(MARCA) :])
-            except json.JSONDecodeError:
-                resultado = None
-            break
-    if not isinstance(resultado, dict):
+                return _Revision.model_validate(json.loads(linea[len(MARCA) :]))
+            except (ValueError, ValidationError):  # JSON roto o con tipos que no son
+                return None
+    return None
+
+
+def _revisar(lista: list[dict], config: ConfigSandbox, limite: float) -> list[VerificacionCodigo]:
+    corrida = _correr("revisar", lista, config, limite)
+    if corrida is None:
+        return [_aviso(TipoVerificacion.SINTAXIS, "ast.parse y ruff", SIN_TIEMPO, agotado=True)]
+    if corrida.tiempo_agotado:
+        return [
+            _aviso(
+                TipoVerificacion.SINTAXIS,
+                "ast.parse y ruff",
+                AGOTADO,
+                agotado=True,
+                duracion_ms=corrida.duracion_ms,
+            )
+        ]
+    texto = corrida.salida.decode("utf-8", errors="replace")
+    revision = _leer_revision(texto)
+    if revision is None:
         return [
             VerificacionCodigo(
                 tipo=TipoVerificacion.SINTAXIS,
@@ -151,24 +213,21 @@ def _revisar(lista: list[dict], config: ConfigSandbox, limite: float) -> list[Ve
             )
         ]
     pasos = (
-        ("sintaxis", TipoVerificacion.SINTAXIS),
-        ("estilo", TipoVerificacion.ESTATICO),
-        ("seguridad", TipoVerificacion.ESTATICO),
+        (revision.sintaxis, TipoVerificacion.SINTAXIS),
+        (revision.estilo, TipoVerificacion.ESTATICO),
+        (revision.seguridad, TipoVerificacion.ESTATICO),
     )
-    verificaciones = []
-    for clave, tipo in pasos:
-        paso = resultado.get(clave) or {}
-        verificaciones.append(
-            VerificacionCodigo(
-                tipo=tipo,
-                comando=str(paso.get("comando", clave))[:500],
-                codigo_salida=paso.get("codigo_salida"),
-                salida=limpiar_salida(str(paso.get("salida", ""))),
-                duracion_ms=max(int(paso.get("duracion_ms", 0)), 0),
-                tiempo_agotado=False,
-            )
+    return [
+        VerificacionCodigo(
+            tipo=tipo,
+            comando=paso.comando,
+            codigo_salida=paso.codigo_salida,
+            salida=limpiar_salida(paso.salida),
+            duracion_ms=paso.duracion_ms,
+            tiempo_agotado=False,
         )
-    return verificaciones
+        for paso, tipo in pasos
+    ]
 
 
 def _pruebas(lista: list[dict], config: ConfigSandbox, limite: float) -> VerificacionCodigo:

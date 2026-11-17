@@ -8,10 +8,19 @@ from pydantic import Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 SECRETO_MINIMO = 32
+# Variables con secretos. En modo proceso se sacan de os.environ al arrancar, después de
+# leerlas, para que ningún proceso hijo las herede (app.sandbox.preparar_proceso_web, D-18).
+SECRETOS_DEL_ENTORNO = frozenset(
+    {"LLM_API_KEY", "SUPABASE_SERVICE_KEY", "JWT_SECRETO", "DATABASE_URL", "PRUEBAS_DATABASE_URL"}
+)
 
 
 class Ajustes(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
+    # hide_input_in_errors: si un ajuste está mal, el error (que sale en el registro de Render)
+    # no repite los valores, que traen las llaves.
+    model_config = SettingsConfigDict(
+        env_file=".env", env_file_encoding="utf-8", extra="ignore", hide_input_in_errors=True
+    )
 
     # Lista cerrada: si ENTORNO queda mal escrito la app no arranca, en vez de
     # arrancar sin avisar en modo desarrollo (cookie sin HTTPS).
@@ -75,6 +84,9 @@ class Ajustes(BaseSettings):
                 raise ValueError(
                     "En producción ORIGENES_PERMITIDOS debe ser la dirección https de la app (sin * ni http)."
                 )
+            if self.sandbox_mode == "proceso" and self.sandbox_pruebas:
+                # Sin contenedor, el código del estudiante correría junto a la app (D-18).
+                raise ValueError("En producción con SANDBOX_MODE=proceso, SANDBOX_PRUEBAS debe ser false.")
         elif not self.jwt_secreto:
             # En el PC, sin secreto, se inventa uno: las sesiones duran hasta que se reinicia la app.
             self.jwt_secreto = secrets.token_urlsafe(48)

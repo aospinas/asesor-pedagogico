@@ -14,14 +14,17 @@ Recibe por la entrada estándar un JSON:
   sistema y un gancho de auditoría que bloquea red, procesos nuevos, ctypes, /proc de otros
   procesos y escrituras fuera de la carpeta de trabajo. Lo que imprime pytest es la salida.
 
-El gancho de auditoría es una defensa extra: no se puede quitar desde Python, pero no es
-tan fuerte como un contenedor (por eso en Render las pruebas vienen apagadas, D-18).
+El gancho de auditoría es una capa extra, NO una barrera: código Python decidido puede
+saltárselo (por ejemplo con lo que no avisa a los ganchos). La barrera es el contenedor
+(modo docker). Por eso en producción la app no arranca con el modo proceso y las pruebas
+encendidas (app/config.py, D-18).
 """
 
 import ast
 import json
 import os
-import subprocess
+import posixpath
+import subprocess  # nosec B404
 import sys
 import tempfile
 import time
@@ -45,8 +48,14 @@ EVENTOS_BLOQUEADOS = frozenset(
         "os.killpg",
         "os.setsid",
         "pty.spawn",
-        "sys._getframe_hidden",
         "sys.remote_exec",
+        # gc deja llegar a cualquier objeto, también al gancho y sus listas
+        "gc.get_objects",
+        "gc.get_referrers",
+        "gc.get_referents",
+        # sqlite puede cargar librerías nativas
+        "sqlite3.enable_load_extension",
+        "sqlite3.load_extension",
         "sys.addaudithook",  # nadie más agrega ganchos (un gancho que lanza error frena el evento)
         "webbrowser.open",
         "urllib.Request",
@@ -88,6 +97,8 @@ EVENTOS_DE_ARCHIVO = frozenset(
 )
 ESCRITURA = os.O_WRONLY | os.O_RDWR | os.O_CREAT | os.O_APPEND | os.O_TRUNC
 ESCRITURA_PERMITIDA = frozenset({"/dev/null"})  # pytest abre su registro ahí
+# Funciones sin evento de auditoría que dejan señalar a otro proceso (pidfd)
+SIN_AUDITORIA = (("os", "pidfd_open"), ("posix", "pidfd_open"), ("signal", "pidfd_send_signal"))
 
 
 def ruta_valida(ruta: str) -> bool:
@@ -163,7 +174,10 @@ def revisar_sintaxis(carpeta: str, rutas_py: list[str]) -> dict:
         except (RecursionError, MemoryError, ValueError) as error:
             errores.append(f"{ruta}:0: no se pudo analizar ({type(error).__name__})")
     if errores:
-        salida = f"{len(errores)} archivo(s) con error de sintaxis de {len(rutas_py)}:\n" + "\n".join(errores)
+        salida = f"{len(errores)} archivo(s) con error de sintaxis de {len(rutas_py)}:\n"
+        salida += "\n".join(errores[:MAXIMO_LINEAS])
+        if len(errores) > MAXIMO_LINEAS:
+            salida += f"\n... y {len(errores) - MAXIMO_LINEAS} más."
     else:
         salida = f"Sin errores de sintaxis en {len(rutas_py)} archivo(s) .py."
     return {
@@ -231,16 +245,23 @@ def binario_ruff(carpeta: str) -> str:
     return binario
 
 
-def revisar_ruff(carpeta: str, reglas: tuple[str, ...], *, por_tipo: bool, binario: str) -> dict:
-    """ruff no ejecuta el código. --isolated: no lee la configuración que traiga la entrega."""
+def revisar_ruff(
+    carpeta: str, reglas: tuple[str, ...], rutas: list[str], *, por_tipo: bool, binario: str
+) -> dict:
+    """ruff no ejecuta el código. Lo que la entrega no puede apagar:
+    --isolated (no lee su configuración), --ignore-noqa (ni `# noqa` ni `# ruff: noqa` ni
+    `# ruff: disable`), --no-respect-gitignore (ni .gitignore ni .ignore) y la lista explícita
+    de archivos (ruff no se salta carpetas como build/ o venv/). Cada ruta va con "./" para
+    que un archivo llamado "--algo.py" no se tome como opción."""
     seleccion = ",".join(reglas)
-    comando = [binario, "check", "--isolated", "--no-cache"]
-    comando += ["--select", seleccion, "--output-format", "json", "--target-version", "py312", "."]
+    comando = [binario, "check", "--isolated", "--no-cache", "--ignore-noqa", "--no-respect-gitignore"]
+    comando += ["--select", seleccion, "--output-format", "json", "--target-version", "py312", "--"]
+    comando += ["./" + r for r in rutas]
     entorno = {"PATH": os.environ.get("PATH", "/usr/bin:/bin"), "HOME": carpeta, "RAYON_NUM_THREADS": "2"}
     inicio = time.monotonic()
-    hecho = subprocess.run(comando, cwd=carpeta, env=entorno, capture_output=True, text=True, check=False)  # noqa: S603
+    hecho = subprocess.run(comando, cwd=carpeta, env=entorno, capture_output=True, text=True, check=False)  # noqa: S603  # nosec B603
     duracion = int((time.monotonic() - inicio) * 1000)
-    visible = f"ruff check --isolated --select {seleccion}"
+    visible = f"ruff check --isolated --ignore-noqa --select {seleccion} ({len(rutas)} archivo(s))"
     try:
         # Con --output-format json ruff siempre imprime una lista ("[]" si no hay nada):
         # una salida vacía o de otro tipo es una falla, nunca "sin hallazgos".
@@ -266,55 +287,120 @@ def revisar_ruff(carpeta: str, reglas: tuple[str, ...], *, por_tipo: bool, binar
 
 def revisar(carpeta: str, archivos: list[dict]) -> dict:
     rutas_py = sorted(a["ruta"] for a in archivos if a["ruta"].endswith(".py"))
+    # ruff también revisa cuadernos de Jupyter y archivos de tipos
+    rutas_ruff = sorted(a["ruta"] for a in archivos if a["ruta"].endswith((".py", ".pyi", ".ipynb")))
     binario = binario_ruff(carpeta)
     return {
         "sintaxis": revisar_sintaxis(carpeta, rutas_py),
-        "estilo": revisar_ruff(carpeta, RUFF_ESTILO, por_tipo=True, binario=binario),
-        "seguridad": revisar_ruff(carpeta, RUFF_SEGURIDAD, por_tipo=False, binario=binario),
+        "estilo": revisar_ruff(carpeta, RUFF_ESTILO, rutas_ruff, por_tipo=True, binario=binario),
+        "seguridad": revisar_ruff(carpeta, RUFF_SEGURIDAD, rutas_ruff, por_tipo=False, binario=binario),
     }
 
 
-def crear_gancho(carpeta: str):
-    """Gancho de auditoría para cuando corre el código del estudiante."""
-    carpeta = os.path.realpath(carpeta)
+def crear_gancho(carpeta: str, raices_permitidas: tuple[str, ...] = ()):
+    """Gancho de auditoría para cuando corre el código del estudiante.
+
+    Todo lo que usa queda guardado en el cierre al crearlo: si el estudiante cambia las
+    listas de este módulo (`import __main__`) o funciones de `os`, el gancho no se entera.
+    `raices_permitidas`: carpetas de donde sí se pueden cargar extensiones nativas (las de
+    Python instalado); cualquier otra se rechaza.
+    """
+    realpath, normpath, fsdecode, fspath = os.path.realpath, posixpath.normpath, os.fsdecode, os.fspath
+    separador = os.sep
+    carpeta = realpath(carpeta)
     propio = str(os.getpid())
+    bloqueados, prefijos = frozenset(EVENTOS_BLOQUEADOS), tuple(PREFIJOS_BLOQUEADOS)
+    de_archivo, nativas = frozenset(EVENTOS_DE_ARCHIVO), tuple(EXTENSIONES_NATIVAS)
+    permitidas, escritura = frozenset(ESCRITURA_PERMITIDA), ESCRITURA
+    raices = tuple(realpath(r) + separador for r in raices_permitidas)
+    rechazo = PermissionError
+
+    def texto_de(ruta) -> str | None:
+        try:
+            return fsdecode(fspath(ruta))
+        except TypeError:
+            return None
 
     def adentro(ruta) -> bool:
-        if isinstance(ruta, int):  # descriptor ya abierto
-            return True
-        try:
-            ruta = os.fsdecode(ruta)
-        except TypeError:
+        """La ruta (relativa a la carpeta de trabajo real) queda dentro de la carpeta."""
+        texto = texto_de(ruta)
+        if texto is None:
             return False
-        absoluta = os.path.realpath(os.path.join(carpeta, ruta))
-        return absoluta == carpeta or absoluta.startswith(carpeta + os.sep)
+        absoluta = realpath(texto)
+        return absoluta == carpeta or absoluta.startswith(carpeta + separador)
 
     def nativa(ruta) -> bool:
-        return isinstance(ruta, (str, bytes)) and os.fsdecode(ruta).lower().endswith(EXTENSIONES_NATIVAS)
+        texto = texto_de(ruta)
+        return texto is not None and texto.lower().endswith(nativas)
+
+    def otro_proceso(texto: str) -> bool:
+        """/proc de otro proceso, también escrito como //proc, /proc/self/../N o con enlaces."""
+        for forma in ("/" + normpath(texto.replace("\\", "/")).lstrip("/"), realpath(texto)):
+            partes = forma.replace("\\", "/").split("/")
+            if len(partes) > 2 and partes[1] == "proc" and partes[2].isdigit() and partes[2] != propio:
+                return True
+        return False
 
     def gancho(evento: str, args: tuple) -> None:
-        if evento in EVENTOS_BLOQUEADOS or evento.startswith(PREFIJOS_BLOQUEADOS):
-            raise PermissionError(f"El sandbox no permite '{evento}'.")
+        if evento in bloqueados or evento.startswith(prefijos):
+            raise rechazo(f"El sandbox no permite '{evento}'.")
         if evento == "open":
             ruta, modo, banderas = (tuple(args) + (None, None, None))[:3]
-            if isinstance(ruta, int):
+            if isinstance(ruta, int):  # descriptor que ya estaba abierto
                 return
-            texto = os.fsdecode(ruta) if isinstance(ruta, (str, bytes)) else ""
-            if texto.startswith("/proc/"):
-                parte = texto.split("/")[2] if texto.count("/") >= 2 else ""
-                if parte not in {"self", "thread-self", propio}:
-                    raise PermissionError("El sandbox no permite leer otros procesos.")
+            texto = texto_de(ruta) or ""
+            if otro_proceso(texto):
+                raise rechazo("El sandbox no permite leer otros procesos.")
             escribe = (isinstance(modo, str) and any(c in modo for c in "wax+")) or (
-                isinstance(banderas, int) and banderas & ESCRITURA
+                isinstance(banderas, int) and banderas & escritura
             )
-            if escribe and texto not in ESCRITURA_PERMITIDA and (not adentro(ruta) or nativa(ruta)):
-                raise PermissionError("El sandbox solo permite escribir en su carpeta.")
-        elif evento in EVENTOS_DE_ARCHIVO:
+            if escribe and texto not in permitidas and (not adentro(ruta) or nativa(ruta)):
+                raise rechazo("El sandbox solo permite escribir en su carpeta.")
+        elif evento in de_archivo:
             caminos = [a for a in args[:2] if isinstance(a, (str, bytes, os.PathLike))]
             if any(not adentro(c) or nativa(c) for c in caminos):
-                raise PermissionError("El sandbox solo permite cambiar archivos de su carpeta.")
+                raise rechazo("El sandbox solo permite cambiar archivos de su carpeta.")
+        elif evento == "os.chdir":
+            # Sin esto, las rutas relativas se saldrían de la carpeta. fchdir llega con un número.
+            if not args or isinstance(args[0], int) or not adentro(args[0]):
+                raise rechazo("El sandbox no permite salir de su carpeta.")
+        elif evento == "sqlite3.connect":
+            base = texto_de(args[0]) if args else None
+            if base not in {":memory:", ""} and (
+                base is None or base.startswith("file:") or not adentro(base)
+            ):
+                raise rechazo("El sandbox solo permite bases SQLite en su carpeta o en memoria.")
+        elif evento == "import":
+            # CPython solo pone el archivo en este evento al cargar una extensión nativa (los .py
+            # llegan con None). Se acepta solo si está en Python instalado: así no pasa una .so de
+            # la entrega ni una cargada desde /proc/self/fd con memfd, tenga el nombre que tenga.
+            archivo = texto_de(args[1]) if len(args) > 1 and args[1] is not None else None
+            if archivo and not realpath(archivo).startswith(raices):
+                raise rechazo("El sandbox no permite cargar librerías nativas de la entrega.")
 
     return gancho
+
+
+def quitar_funciones_sin_auditoria(objetivos: tuple[tuple[str, str], ...] = SIN_AUDITORIA) -> None:
+    """Quita las funciones que señalan a otro proceso sin pasar por el gancho (pidfd).
+    Solo se llama dentro del sandbox, nunca en el proceso web."""
+    import importlib
+
+    for nombre_modulo, funcion in objetivos:
+        try:
+            modulo = importlib.import_module(nombre_modulo)
+        except ImportError:  # "posix" no existe en Windows
+            continue
+        if hasattr(modulo, funcion):
+            delattr(modulo, funcion)
+
+
+def raices_de_python() -> tuple[str, ...]:
+    """Carpetas de la instalación de Python (biblioteca estándar y paquetes instalados)."""
+    import sysconfig
+
+    nombres = ("stdlib", "platstdlib", "purelib", "platlib")
+    return tuple(sorted({sysconfig.get_path(n) for n in nombres if sysconfig.get_path(n)}))
 
 
 def correr_pruebas(carpeta: str) -> int:
@@ -324,7 +410,8 @@ def correr_pruebas(carpeta: str) -> int:
     tempfile.tempdir = temporal
     import pytest  # se importa antes del gancho: es nuestro, no del estudiante
 
-    sys.addaudithook(crear_gancho(carpeta))
+    quitar_funciones_sin_auditoria()
+    sys.addaudithook(crear_gancho(carpeta, raices_de_python()))
     sys.dont_write_bytecode = True
     argumentos = ["-q", "-p", "no:cacheprovider", "--color=no", "--basetemp", os.path.join(temporal, "pt")]
     return int(pytest.main(argumentos))

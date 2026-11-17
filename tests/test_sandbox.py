@@ -12,13 +12,14 @@ import subprocess
 import sys
 import time
 from dataclasses import replace
+from pathlib import Path
 
 import pytest
 from pydantic import ValidationError
 
 import app.sandbox as sandbox
 from app.archivos.zip import ArchivoCodigo
-from app.config import Ajustes
+from app.config import SECRETOS_DEL_ENTORNO, Ajustes
 from app.esquemas import TipoVerificacion
 from app.sandbox import ConfigSandbox, ejecutar, lanzador, limpiar_salida, verificar
 from app.sandbox.ejecutar import Corrida, SandboxNoDisponible
@@ -30,7 +31,7 @@ SECRETO = "sk-secreto-falso-de-prueba-123"
 
 def _docker_listo() -> bool:
     try:
-        ejecutar.revisar_docker(IMAGEN)
+        ejecutar.revisar_docker(IMAGEN, tiempo_seg=5)
     except SandboxNoDisponible:
         return False
     return True
@@ -207,7 +208,7 @@ def test_modo_solo_docker_o_proceso():
 
 
 def test_docker_run_lleva_todos_los_limites():
-    comando = ejecutar.comando_docker("asesor-sandbox-x", "asesor-sandbox:1", 256, "print(1)")
+    comando = ejecutar.comando_docker("asesor-sandbox-x", "asesor-sandbox:1", 256, "print(1)", 12.3)
     texto = " ".join(comando)
     for esperado in (
         "--rm",
@@ -222,6 +223,7 @@ def test_docker_run_lleva_todos_los_limites():
         "--security-opt no-new-privileges",
         "--user 10001:10001",
         "--ulimit core=0",
+        "--label asesor-sandbox=1",
     ):
         assert esperado in texto
     tmpfs = "/tmp:rw,noexec,nosuid,nodev,size="  # noqa: S108 (/tmp del contenedor)
@@ -238,13 +240,9 @@ def test_docker_run_lleva_todos_los_limites():
         "--network=host",
     ):
         assert prohibido not in comando
-    assert comando[comando.index("asesor-sandbox:1") :][:5] == [
-        "asesor-sandbox:1",
-        "python",
-        "-I",
-        "-B",
-        "-c",
-    ]
+    # Adentro, timeout mata al lanzador aunque falle el docker kill de la app
+    despues = comando[comando.index("asesor-sandbox:1") :]
+    assert despues[:9] == ["asesor-sandbox:1", "timeout", "-s", "KILL", "18", "python", "-I", "-B", "-c"]
 
 
 def test_cliente_docker_no_recibe_secretos(monkeypatch):
@@ -349,7 +347,8 @@ class TestGancho:
     """El gancho de auditoría que se pone antes de correr el código del estudiante."""
 
     @pytest.fixture
-    def gancho(self, tmp_path):
+    def gancho(self, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)  # en el sandbox, la carpeta de trabajo es la de la entrega
         return lanzador.crear_gancho(str(tmp_path))
 
     @pytest.mark.parametrize(
@@ -466,6 +465,83 @@ def test_no_lee_procesos_ajenos():
         return
     with pytest.raises(OSError):
         open(f"/proc/{{otro}}/environ", "rb").read()
+
+
+def test_proc_disfrazado():
+    for ruta in ("//proc/1/environ", "/proc/self/../1/environ", "/proc/./1/environ"):
+        with pytest.raises(OSError):
+            open(ruta, "rb").read()
+
+
+def test_cambiar_las_listas_del_gancho_no_sirve():
+    import __main__
+
+    __main__.PREFIJOS_BLOQUEADOS = ()
+    __main__.EVENTOS_BLOQUEADOS = frozenset()
+    __main__.EVENTOS_DE_ARCHIVO = frozenset()
+    with pytest.raises(OSError):
+        subprocess.run(["true"], check=False)
+    with pytest.raises(OSError):
+        socket.socket()
+
+
+def test_sin_gc_ni_pidfd():
+    import gc
+    import signal
+
+    with pytest.raises(OSError):
+        gc.get_objects()
+    with pytest.raises(OSError):
+        gc.get_referrers(os)
+    assert not hasattr(os, "pidfd_open")
+    assert not hasattr(signal, "pidfd_send_signal")
+
+
+def test_sqlite_solo_en_memoria_o_en_su_carpeta(tmp_path):
+    import sqlite3
+
+    sqlite3.connect(":memory:").close()
+    sqlite3.connect(tmp_path / "ok.db").close()
+    for base in ("/tmp/fuera.db", "file:/tmp/fuera.db?mode=rwc"):
+        with pytest.raises(OSError):
+            sqlite3.connect(base, uri=True)
+
+
+def test_no_sale_de_su_carpeta_con_chdir(tmp_path):
+    os.chdir(tmp_path)  # adentro sí
+    with pytest.raises(OSError):
+        os.chdir("/")
+    with pytest.raises(OSError):
+        os.chdir("/tmp")
+
+
+def test_no_carga_librerias_nativas_propias():
+    import glob
+    import importlib.machinery
+    import importlib.util
+    import sys
+    import sysconfig
+
+    # Una extensión que todavía no esté cargada: si ya lo está, Python usa la que tiene y no
+    # carga código nuevo (así que no habría nada que bloquear).
+    carpeta = os.path.join(sysconfig.get_path("platstdlib"), "lib-dynload")
+    candidatas = [
+        (nombre, archivo)
+        for nombre in ("_bz2", "_lzma", "_curses", "_dbm", "_gdbm", "_testcapi")
+        if nombre not in sys.modules
+        for archivo in glob.glob(os.path.join(carpeta, nombre + ".*so"))
+    ]
+    if not candidatas or not hasattr(os, "memfd_create"):
+        pytest.skip("Esta instalación de Python no trae extensiones aparte")
+    nombre, archivo = candidatas[0]
+    with open(archivo, "rb") as original:
+        datos = original.read()
+    fd = os.memfd_create("truco")
+    os.write(fd, datos)
+    cargador = importlib.machinery.ExtensionFileLoader(nombre, f"/proc/self/fd/{{fd}}")
+    spec = importlib.util.spec_from_loader(nombre, cargador)
+    with pytest.raises(OSError):
+        importlib.util.module_from_spec(spec)
 """
 NOMBRES_HOSTILES = (
     "test_red_socket",
@@ -475,6 +551,12 @@ NOMBRES_HOSTILES = (
     "test_no_escribe_fuera_de_su_carpeta",
     "test_escribe_en_tmp_path",
     "test_no_lee_procesos_ajenos",
+    "test_proc_disfrazado",
+    "test_cambiar_las_listas_del_gancho_no_sirve",
+    "test_sin_gc_ni_pidfd",
+    "test_sqlite_solo_en_memoria_o_en_su_carpeta",
+    "test_no_sale_de_su_carpeta_con_chdir",
+    "test_no_carga_librerias_nativas_propias",
 )
 
 
@@ -505,10 +587,17 @@ def test_matriz_cada_escape_queda_bloqueado(hostil, nombre):
     assert not [f for f in _fallidas(hostil) if f"::{nombre}" in f], hostil.salida
 
 
+def test_matriz_sin_errores_de_recoleccion(hostil):
+    assert not [linea for linea in hostil.salida.splitlines() if linea.startswith("ERROR")], hostil.salida
+
+
 def test_matriz_red_entorno_y_procesos_todas_pasan(hostil):
     """Matriz C3: red bloqueada y entorno vacío (las pruebas del estudiante lo comprueban)."""
     assert hostil.codigo_salida == 0, hostil.salida
-    assert f"{len(NOMBRES_HOSTILES)} passed" in hostil.salida
+    # La de librerías nativas se salta si Python no trae _bisect aparte
+    assert f"{len(NOMBRES_HOSTILES)} passed" in hostil.salida or (
+        f"{len(NOMBRES_HOSTILES) - 1} passed, 1 skipped" in hostil.salida
+    )
     assert SECRETO not in hostil.salida
 
 
@@ -634,7 +723,7 @@ def test_binario_de_ruff_es_el_instalado(tmp_path):
 def test_ruff_sin_salida_no_es_sin_hallazgos(tmp_path):
     """Si ruff no imprime su lista (falló o no era ruff), se dice que no pudo revisar."""
     resultado = lanzador.revisar_ruff(
-        str(tmp_path), lanzador.RUFF_SEGURIDAD, por_tipo=False, binario=sys.executable
+        str(tmp_path), lanzador.RUFF_SEGURIDAD, ["a.py"], por_tipo=False, binario=sys.executable
     )
     assert resultado["codigo_salida"] == 2
     assert resultado["salida"].startswith("ruff no pudo revisar el código.")
@@ -672,3 +761,311 @@ def test_proceso_web_protegido_no_deja_leer_sus_variables():
     hecho = subprocess.run(["cat", f"/proc/{os.getpid()}/environ"], capture_output=True, check=False)  # noqa: S607
     assert hecho.returncode != 0
     assert not hecho.stdout
+
+
+# ---------- Arreglos de la Puerta 2 ----------
+
+
+def _produccion(**cambios) -> dict:
+    base = {
+        "entorno": "produccion",
+        "jwt_secreto": "x" * 40,
+        "database_url": "postgresql+psycopg://u:c@h:5432/b",
+        "origenes_permitidos": "https://asesor.onrender.com",
+        "sandbox_mode": "proceso",
+        "sandbox_pruebas": False,
+    }
+    return base | cambios
+
+
+def test_produccion_no_arranca_con_proceso_y_pruebas():
+    """En Render (modo proceso) el código del estudiante nunca se ejecuta."""
+    with pytest.raises(ValidationError, match="SANDBOX_PRUEBAS"):
+        Ajustes(**_produccion(sandbox_pruebas=True))
+    Ajustes(**_produccion())  # apagadas: arranca
+    Ajustes(**_produccion(sandbox_mode="docker", sandbox_pruebas=True))  # con contenedor: arranca
+
+
+def test_render_apaga_las_pruebas():
+    texto = Path(__file__).resolve().parent.parent.joinpath("render.yaml").read_text(encoding="utf-8")
+    assert "key: SANDBOX_MODE\n        value: proceso" in texto
+    assert 'key: SANDBOX_PRUEBAS\n        value: "false"' in texto
+
+
+@pytest.fixture
+def secretos_falsos(monkeypatch):
+    """Pone secretos únicos en el entorno; monkeypatch los devuelve como estaban al final."""
+    valor = f"{SECRETO}-{os.getpid()}-{time.monotonic_ns()}"
+    for nombre in SECRETOS_DEL_ENTORNO:
+        monkeypatch.setenv(nombre, valor)
+    monkeypatch.setattr(ejecutar, "proteger_proceso_web", lambda: None)
+    return valor
+
+
+def test_preparar_proceso_web_saca_los_secretos_del_entorno(secretos_falsos):
+    sandbox.preparar_proceso_web()
+    assert not SECRETOS_DEL_ENTORNO & set(os.environ)
+    # Un proceso hijo ya no los hereda
+    hijo = subprocess.run(
+        [sys.executable, "-c", "import os, sys; sys.stdout.write(repr(sorted(os.environ)))"],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    assert secretos_falsos not in hijo.stdout
+    assert not [n for n in SECRETOS_DEL_ENTORNO if n in hijo.stdout]
+
+
+def test_la_app_sigue_teniendo_sus_ajustes_despues_de_preparar(secretos_falsos):
+    from app.config import ajustes
+
+    antes = ajustes().jwt_secreto
+    sandbox.preparar_proceso_web()
+    assert ajustes().jwt_secreto == antes  # quedaron guardados al leerlos
+
+
+@pytest.mark.skipif(not EN_LINUX, reason="/proc solo existe en Linux")
+def test_ningun_proceso_del_usuario_queda_con_los_secretos(monkeypatch):
+    """El caso del revisor: el lector de PDF (spawn) deja un resource_tracker vivo con el
+    entorno de la app. Después de preparar, ningún proceso nuevo lleva los secretos."""
+    from archivos_prueba import pdf
+
+    from app.archivos.pdf import leer_paginas
+
+    if os.geteuid() == 0:
+        pytest.skip("root puede leer todo; en Render la app no corre como root")
+    valor = f"{SECRETO}-tracker-{time.monotonic_ns()}"
+    for nombre in SECRETOS_DEL_ENTORNO:
+        monkeypatch.setenv(nombre, valor)
+    sandbox.preparar_proceso_web()
+    leer_paginas(pdf(), maximo_paginas=5, maximo_caracteres=10000)
+    uid = os.getuid()
+    con_secreto = []
+    for nombre in os.listdir("/proc"):
+        if not nombre.isdigit():
+            continue
+        try:
+            if os.stat(f"/proc/{nombre}").st_uid != uid:
+                continue
+            with open(f"/proc/{nombre}/environ", "rb") as entorno:
+                if valor.encode() in entorno.read():
+                    con_secreto.append(nombre)
+        except OSError:
+            continue
+    assert not con_secreto
+
+
+def test_limpiar_salida_quita_controles_y_colores():
+    sucia = "\x1b[31mrojo\x1b[0m\r\nlinea\x07\u202eal reves\u202c\tfin\x85"
+    assert limpiar_salida(sucia) == "[31mrojo[0m\nlineaal reves\tfin"
+
+
+def _corrida(texto: str, **cambios) -> Corrida:
+    datos = {"codigo_salida": 0, "salida": texto.encode(), "recortada": False, "duracion_ms": 4}
+    return Corrida(**(datos | {"tiempo_agotado": False} | cambios))
+
+
+@pytest.mark.parametrize(
+    "paso",
+    [
+        {"comando": "c", "codigo_salida": "uno", "salida": "x", "duracion_ms": 1},
+        {"comando": "c", "codigo_salida": 0, "salida": "x", "duracion_ms": -5},
+        {"comando": "c", "codigo_salida": 0, "salida": "x", "duracion_ms": 1, "nota": 5},
+        {"comando": "c" * 600, "codigo_salida": 0, "salida": "x", "duracion_ms": 1},
+        "no es un diccionario",
+    ],
+)
+def test_resultado_raro_del_lanzador_es_falla_y_no_error(monkeypatch, paso):
+    datos = {"sintaxis": paso, "estilo": paso, "seguridad": paso}
+    texto = lanzador.MARCA + __import__("json").dumps(datos)
+    monkeypatch.setattr(ejecutar, "revisar_docker", lambda _imagen: None)
+    monkeypatch.setattr(ejecutar, "correr_docker", lambda *a: _corrida(texto))
+    (fallo,) = verificar(_archivos(**{"main.py": "x = 1\n"}), _config("docker"))
+    assert fallo.salida.startswith(sandbox.FALLO)
+
+
+@pytest.mark.parametrize("error", [OSError("docker desapareció"), FileNotFoundError(), RuntimeError("x")])
+def test_error_al_lanzar_no_tumba_la_evaluacion(monkeypatch, error):
+    def falla(*_a):
+        raise error
+
+    monkeypatch.setattr(ejecutar, "revisar_docker", lambda _imagen: None)
+    monkeypatch.setattr(ejecutar, "correr_docker", falla)
+    (aviso,) = verificar(_archivos(**{"main.py": "x = 1\n"}), _config("docker"))
+    assert aviso.salida == sandbox.FALLO
+    assert sandbox._TURNO.acquire(timeout=0.1)  # el turno quedó libre
+    sandbox._TURNO.release()
+
+
+def test_revisar_con_tiempo_agotado(monkeypatch):
+    monkeypatch.setattr(ejecutar, "revisar_docker", lambda _imagen: None)
+    monkeypatch.setattr(
+        ejecutar, "correr_docker", lambda *a: _corrida("", codigo_salida=None, tiempo_agotado=True)
+    )
+    (aviso,) = verificar(_archivos(**{"main.py": "x = 1\n"}), _config("docker"))
+    assert aviso.tiempo_agotado
+    assert aviso.salida == sandbox.AGOTADO
+
+
+def test_pruebas_sin_tiempo_restante(monkeypatch):
+    """Si "revisar" se gastó todo el tiempo, pytest ni arranca y se dice por qué."""
+    llamadas = []
+
+    def revisar_lento(tarea, *a):
+        llamadas.append(tarea)
+        time.sleep(1.1)
+        return _revision_falsa()
+
+    monkeypatch.setattr(ejecutar, "revisar_docker", lambda _imagen: None)
+    monkeypatch.setattr(ejecutar, "correr_docker", revisar_lento)
+    archivos = _archivos(**{"main.py": "x = 1\n", "test_a.py": "def test_a():\n    pass\n"})
+    pruebas = _pruebas(verificar(archivos, _config("docker", tiempo_seg=1)))
+    assert llamadas == ["revisar"]
+    assert pruebas.tiempo_agotado
+    assert pruebas.salida == sandbox.SIN_TIEMPO
+
+
+class TestGanchoEndurecido:
+    @pytest.fixture
+    def gancho(self, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        raiz = tmp_path.parent / "python-instalado"
+        return lanzador.crear_gancho(str(tmp_path), (str(raiz),))
+
+    def test_cambiar_las_listas_despues_no_lo_apaga(self, gancho, monkeypatch):
+        monkeypatch.setattr(lanzador, "EVENTOS_BLOQUEADOS", frozenset())
+        monkeypatch.setattr(lanzador, "PREFIJOS_BLOQUEADOS", ())
+        with pytest.raises(PermissionError):
+            gancho("subprocess.Popen", ("sh", ["sh"], None, None))
+        with pytest.raises(PermissionError):
+            gancho("socket.connect", (None, ("1.1.1.1", 80)))
+
+    @pytest.mark.parametrize(
+        "ruta", ["//proc/1/environ", "/proc/self/../1/environ", "/proc/./1/environ", "///proc/1/mem"]
+    )
+    def test_proc_disfrazado(self, gancho, ruta):
+        with pytest.raises(PermissionError):
+            gancho("open", (ruta, "r", os.O_RDONLY))
+
+    @pytest.mark.parametrize("evento", ["gc.get_objects", "gc.get_referrers", "gc.get_referents"])
+    def test_sin_gc(self, gancho, evento):
+        with pytest.raises(PermissionError):
+            gancho(evento, ())
+
+    def test_chdir_solo_adentro(self, gancho, tmp_path):
+        (tmp_path / "sub").mkdir()
+        gancho("os.chdir", (str(tmp_path / "sub"),))
+        gancho("os.chdir", ("sub",))
+        for afuera in (str(tmp_path.parent), "..", 3):
+            with pytest.raises(PermissionError):
+                gancho("os.chdir", (afuera,))
+
+    def test_escritura_relativa_se_mide_desde_la_carpeta_real(self, gancho, tmp_path):
+        gancho("open", ("adentro.txt", "w", None))
+        with pytest.raises(PermissionError):
+            gancho("open", ("../afuera.txt", "w", None))
+
+    def test_sqlite(self, gancho, tmp_path):
+        gancho("sqlite3.connect", (":memory:",))
+        gancho("sqlite3.connect", (str(tmp_path / "ok.db"),))
+        for base in (str(tmp_path.parent / "fuera.db"), "file:x.db?mode=rwc", None):
+            with pytest.raises(PermissionError):
+                gancho("sqlite3.connect", (base,))
+        for evento in ("sqlite3.enable_load_extension", "sqlite3.load_extension"):
+            with pytest.raises(PermissionError):
+                gancho(evento, (None, True))
+
+    def test_extensiones_nativas_solo_de_python_instalado(self, gancho, tmp_path):
+        instalada = str(tmp_path.parent / "python-instalado" / "lib-dynload" / "_bisect.so")
+        gancho("import", ("_bisect", instalada, [], [], []))
+        gancho("import", ("modulo_de_la_entrega", None, [], [], []))  # los .py llegan sin archivo
+        for ruta in (
+            str(tmp_path / "truco.so"),
+            "/proc/self/fd/3",  # memfd: la ruta no termina en .so
+            str(tmp_path / "x.cpython-312-x86_64-linux-gnu.so"),
+            str(tmp_path / "sin_extension"),
+        ):
+            with pytest.raises(PermissionError):
+                gancho("import", ("truco", ruta, [], [], []))
+
+
+def test_quita_funciones_sin_auditoria(monkeypatch):
+    """Con módulos falsos: quitarlas de verdad dañaría el proceso de las pruebas."""
+    import types
+
+    falso_os, falso_signal = types.ModuleType("falso_os"), types.ModuleType("falso_signal")
+    falso_os.pidfd_open = lambda *a: 0
+    falso_signal.pidfd_send_signal = lambda *a: None
+    monkeypatch.setitem(sys.modules, "falso_os", falso_os)
+    monkeypatch.setitem(sys.modules, "falso_signal", falso_signal)
+    lanzador.quitar_funciones_sin_auditoria(
+        (("falso_os", "pidfd_open"), ("falso_signal", "pidfd_send_signal"), ("falso_os", "no_existe"))
+    )
+    assert not hasattr(falso_os, "pidfd_open")
+    assert not hasattr(falso_signal, "pidfd_send_signal")
+    assert lanzador.SIN_AUDITORIA == (
+        ("os", "pidfd_open"),
+        ("posix", "pidfd_open"),
+        ("signal", "pidfd_send_signal"),
+    )
+
+
+def test_raices_de_python_son_carpetas_absolutas():
+    raices = lanzador.raices_de_python()
+    assert raices
+    assert all(os.path.isabs(r) for r in raices)
+
+
+@sin_modos
+@pytest.mark.parametrize("modo", MODOS)
+def test_la_entrega_no_puede_esconder_hallazgos_de_ruff(modo):
+    """# noqa, # ruff: noqa, # ruff: disable, .ignore, .gitignore y carpetas como build/ no
+    esconden nada; y un archivo llamado "--fix.py" no se toma como opción de ruff."""
+    malo = "x = eval(input())\n"
+    archivos = _archivos(
+        **{
+            "a.py": "# ruff: noqa\n" + malo,
+            "b.py": "x = eval(input())  # noqa: S307\n",
+            "c.py": "# ruff: disable[S307]\n" + malo + "# ruff: enable[S307]\n",
+            "build/d.py": malo,
+            "venv/e.py": malo,
+            "--fix.py": malo,
+            ".ignore": "*\n",
+            ".gitignore": "*\n",
+            "pyproject.toml": "[tool.ruff]\nexclude = ['*']\n",
+        }
+    )
+    _sintaxis, _estilo, seguridad = verificar(archivos, _config(modo))
+    assert seguridad.salida.count("S307") == 6, seguridad.salida
+    assert seguridad.codigo_salida == 1
+    assert "(6 archivo(s))" in seguridad.comando
+
+
+def test_sintaxis_lista_con_tope(tmp_path):
+    rutas = [f"m{i}.py" for i in range(lanzador.MAXIMO_LINEAS + 5)]
+    lanzador.escribir_archivos(str(tmp_path), [{"ruta": r, "texto": "def f(:\n"} for r in rutas])
+    resultado = lanzador.revisar_sintaxis(str(tmp_path), rutas)
+    assert resultado["salida"].endswith("... y 5 más.")
+
+
+@pytest.mark.skipif(not EN_LINUX, reason="Los enlaces y chmod se prueban en Linux")
+def test_borrar_no_sigue_enlaces(tmp_path):
+    afuera = tmp_path / "afuera"
+    afuera.mkdir(mode=0o755)
+    carpeta = tmp_path / "sandbox-x"
+    carpeta.mkdir()
+    (carpeta / "enlace").symlink_to(afuera, target_is_directory=True)
+    afuera.chmod(0o500)
+    ejecutar._borrar(str(carpeta))
+    assert not carpeta.exists()
+    assert afuera.exists()
+    assert (afuera.stat().st_mode & 0o777) == 0o500
+
+
+def test_error_de_ajustes_no_muestra_los_secretos():
+    """El error de arranque sale en el registro de Render: no debe traer las llaves."""
+    llave = "sk-no-debe-salir-en-el-registro-123456"
+    with pytest.raises(ValidationError) as error:
+        Ajustes(**_produccion(sandbox_pruebas=True, llm_api_key=llave, jwt_secreto=llave))
+    assert llave not in str(error.value)
+    assert "SANDBOX_PRUEBAS" in str(error.value)
