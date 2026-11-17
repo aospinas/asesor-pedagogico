@@ -151,6 +151,16 @@ class AccionRevision(StrEnum):
     PUBLICAR = "publicar"
 
 
+class OrigenRubrica(StrEnum):
+    """De dónde salió una versión de la rúbrica. Las de archivo (salvo JSON) pasan por la IA."""
+
+    JSON = "json"
+    PDF = "pdf"
+    DOCX = "docx"
+    TEXTO = "texto"
+    EDITOR = "editor"
+
+
 class ProveedorIA(StrEnum):
     OPENAI = "openai"
     OLLAMA = "ollama"
@@ -241,6 +251,17 @@ class Laboratorio(LaboratorioCrear):
     id: UUID
 
 
+class LaboratorioEditar(Estricto):
+    """Solo cambia lo que venga. La cohorte no se cambia: las entregas ya cuelgan de ella."""
+
+    titulo: str | None = Field(default=None, min_length=1, max_length=160)
+    descripcion: str | None = Field(default=None, min_length=1, max_length=5000)
+    objetivos: str | None = Field(default=None, min_length=1, max_length=5000)
+    temas_ia: list[Annotated[str, Field(min_length=1, max_length=80)]] | None = Field(
+        default=None, max_length=30
+    )
+
+
 # ---------- Rúbricas ----------
 
 
@@ -255,8 +276,10 @@ class Criterio(Estricto):
     id: str = Field(min_length=1, max_length=40)
     nombre: str = Field(min_length=1, max_length=200)
     competencia: str = Field(max_length=200)
-    peso: float = Field(gt=0, le=100, allow_inf_nan=False, description="Porcentaje; todos suman 100")
-    niveles: list[Nivel] = Field(min_length=2, max_length=10)
+    # Peso 0 y un solo nivel se aceptan aquí para que una rúbrica incompleta se pueda
+    # guardar y corregir en el editor; `validar_rubrica` los marca como error (RF-05).
+    peso: float = Field(ge=0, le=100, allow_inf_nan=False, description="Porcentaje; todos suman 100")
+    niveles: list[Nivel] = Field(min_length=1, max_length=10)
 
     @property
     def valor_maximo(self) -> float:
@@ -282,6 +305,10 @@ def validar_rubrica(rubrica: RubricaEstructura) -> list[str]:
         errores.append(f"Criterios con id repetido: {', '.join(repetidos)}.")
 
     for c in rubrica.criterios:
+        if c.peso <= 0:
+            errores.append(f"El criterio '{c.nombre}' no tiene peso.")
+        if len(c.niveles) < 2:
+            errores.append(f"El criterio '{c.nombre}' necesita al menos 2 niveles.")
         ids_niveles = [n.id for n in c.niveles]
         if len(set(ids_niveles)) != len(ids_niveles):
             errores.append(f"El criterio '{c.nombre}' tiene niveles con id repetido.")
@@ -293,7 +320,7 @@ def validar_rubrica(rubrica: RubricaEstructura) -> list[str]:
                 f"Los niveles del criterio '{c.nombre}' no están en orden: "
                 "sus valores deben ir de menor a mayor (o de mayor a menor) sin repetirse."
             )
-        if c.valor_maximo <= 0:
+        if len(c.niveles) >= 2 and c.valor_maximo <= 0:
             errores.append(f"El criterio '{c.nombre}' no tiene ningún nivel con valor mayor a 0.")
         sin_descriptor = [n.nombre for n in c.niveles if not n.descriptor]
         if sin_descriptor:
@@ -315,7 +342,19 @@ class RubricaVersion(Estricto):
     estructura: RubricaEstructura
     valida: bool
     errores: list[str]
+    origen: OrigenRubrica
+    # La convirtió la IA y el docente todavía no la revisa: no sirve para evaluar (D-16).
+    por_confirmar: bool = False
+    prompt_version: str | None = None  # solo si pasó por la IA
     creada_por: UUID
+    fecha: datetime
+
+
+class RubricaPublica(Estricto):
+    """Lo que ve el estudiante de la rúbrica: solo la estructura de la última versión lista."""
+
+    numero: int = Field(ge=1)
+    estructura: RubricaEstructura
     fecha: datetime
 
 

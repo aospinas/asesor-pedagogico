@@ -4,6 +4,7 @@ La tabla de app/api/rutas.py manda: estas pruebas revisan que cada ruta que ya
 existe en la app la cumpla, sin tener que escribir una prueba por ruta.
 """
 
+import re
 from uuid import uuid4
 
 import pytest
@@ -41,8 +42,23 @@ ESPERADAS_EN_AUTH = {
 }
 
 
+ESPERADAS_EN_RUBRICAS = {
+    ("GET", "/api/cohortes"),
+    ("POST", "/api/cohortes"),
+    ("GET", "/api/laboratorios"),
+    ("POST", "/api/laboratorios"),
+    ("GET", "/api/laboratorios/{laboratorio_id}"),
+    ("PATCH", "/api/laboratorios/{laboratorio_id}"),
+    ("GET", "/api/laboratorios/{laboratorio_id}/rubrica"),
+    ("POST", "/api/laboratorios/{laboratorio_id}/rubrica"),
+    ("PUT", "/api/laboratorios/{laboratorio_id}/rubrica"),
+    ("GET", "/api/laboratorios/{laboratorio_id}/rubrica/versiones"),
+}
+
+
 def camino(ruta: str) -> str:
-    return ruta.replace("{usuario_id}", str(uuid4()))
+    """Cambia cada {algo_id} por un id al azar, para que la ruta sea válida."""
+    return re.sub(r"\{\w+_id\}", lambda _: str(uuid4()), ruta)
 
 
 def test_no_hay_rutas_por_fuera_de_la_tabla():
@@ -50,7 +66,7 @@ def test_no_hay_rutas_por_fuera_de_la_tabla():
 
 
 def test_las_rutas_de_este_modulo_ya_existen():
-    assert set(CONSTRUIDAS) >= ESPERADAS_EN_AUTH
+    assert set(CONSTRUIDAS) >= ESPERADAS_EN_AUTH | ESPERADAS_EN_RUBRICAS
 
 
 @pytest.mark.parametrize(("metodo", "ruta"), [c for c in CONSTRUIDAS if not TABLA[c].publica])

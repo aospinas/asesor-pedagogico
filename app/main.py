@@ -14,7 +14,7 @@ from slowapi.errors import RateLimitExceeded
 from sqlalchemy.exc import OperationalError
 from starlette.exceptions import HTTPException as ErrorHTTP
 
-from app.api import auditoria, sesion, usuarios
+from app.api import auditoria, laboratorios, rubricas, sesion, usuarios
 from app.api.seguridad import limitador
 from app.config import ajustes
 from app.db import BaseNoDisponible
@@ -31,6 +31,9 @@ app = FastAPI(
 app.state.limiter = limitador
 
 METODOS_QUE_CAMBIAN_DATOS = {"POST", "PUT", "PATCH", "DELETE"}
+# El archivo más grande que se acepta (la rúbrica, 5 MB) más el sobre del formulario.
+# Si un módulo necesita subir algo más grande (entregas), se sube aquí con su decisión.
+MAXIMO_CUERPO_BYTES = 6 * 1024 * 1024
 
 
 def _viene_de_otro_sitio(request: Request) -> bool:
@@ -48,12 +51,37 @@ def _viene_de_otro_sitio(request: Request) -> bool:
     return request.headers.get("sec-fetch-site", "").lower() == "cross-site"
 
 
+def _cuerpo_no_permitido(request: Request) -> JSONResponse | None:
+    """Frena las peticiones demasiado grandes ANTES de leerlas (OWASP A08).
+
+    FastAPI guarda en disco los archivos subidos antes de revisar la sesión: sin este
+    tope, cualquiera podría llenar el disco del servidor sin haber iniciado sesión.
+    """
+    if request.method not in METODOS_QUE_CAMBIAN_DATOS:
+        return None
+    if "transfer-encoding" in request.headers:  # sin tamaño declarado no se sabe cuánto llega
+        return JSONResponse({"detail": "Falta el tamaño de la petición."}, status.HTTP_411_LENGTH_REQUIRED)
+    try:
+        tamano = int(request.headers.get("content-length", "0"))
+    except ValueError:
+        tamano = MAXIMO_CUERPO_BYTES + 1
+    if tamano > MAXIMO_CUERPO_BYTES:
+        return JSONResponse(
+            {"detail": f"La petición pesa más de {MAXIMO_CUERPO_BYTES // (1024 * 1024)} MB."},
+            status.HTTP_413_CONTENT_TOO_LARGE,
+        )
+    return None
+
+
 @app.middleware("http")
 async def proteger(request: Request, call_next):
+    rechazo = _cuerpo_no_permitido(request)
     if _viene_de_otro_sitio(request):
         respuesta = JSONResponse(
             {"detail": "Petición no permitida desde ese sitio."}, status.HTTP_403_FORBIDDEN
         )
+    elif rechazo is not None:
+        respuesta = rechazo
     else:
         try:
             respuesta = await call_next(request)
@@ -130,3 +158,5 @@ def salud() -> dict[str, str]:
 app.include_router(sesion.router)
 app.include_router(usuarios.router)
 app.include_router(auditoria.router)
+app.include_router(laboratorios.router)
+app.include_router(rubricas.router)
