@@ -121,6 +121,7 @@ con la skill `frontend-design`.
 
 1. Confirmar el verde oficial de la Universidad de Manizales antes de construir.
 2. **Al final del proyecto:** la página del equipo (pantalla 5). El equipo son
-   **3 personas**, no 2 como dicen los bocetos: faltan el nombre de la tercera
-   persona, la foto de cada uno (retrato real, no de stock) y su rol. Mientras
+   **3 personas**, no 2 como dicen los bocetos: Andrés Ospina Silva, Santiago
+   Arias Aguirre y Jerónimo Aristizabal. Faltan la foto de cada uno (retrato real,
+   no de stock) y su rol. Mientras
    tanto la pantalla se construye con espacios marcados "[…]".
