@@ -31,10 +31,15 @@ asesor-pedagogico/
 ├── app/
 │   ├── esquemas.py            contrato de datos con la IA (extra="forbid")
 │   ├── evaluador/nota.py      ÚNICO lugar donde se calcula la nota
-│   ├── main.py                API (por ahora solo /salud)
-│   └── api, sandbox, rubricas, informes, ia, auditoria   (se llenan con /modulo)
+│   ├── main.py                arranque de la API, cabeceras de seguridad y errores
+│   ├── config.py, db.py, modelos.py   ajustes, conexión y tablas de la base
+│   ├── api/rutas.py           tabla de rutas con el rol que puede usar cada una
+│   ├── api/                   seguridad, sesión, usuarios y auditoría
+│   ├── crear_admin.py         comando para crear el primer administrador
+│   └── sandbox, rubricas, informes, ia   (se llenan con /modulo)
+├── migraciones/               cambios de la base de datos (Alembic)
 ├── prompts/                   prompts versionados
-├── tests/                     31 pruebas (nota, esquemas y guardrail)
+├── tests/                     pruebas (nota, esquemas, rutas, sesión, usuarios, auditoría, guardrail)
 ├── frontend/                  React, después de elegir el diseño
 ├── docs/
 │   ├── srs.md                 SRS completo (lo que lee Claude Code)
@@ -68,11 +73,17 @@ py -3.15 -m venv .venv
 pip install -r requirements-dev.txt
 
 # 2. Verificar que todo está bien
-pytest -q                      # deben pasar 31
+pytest -q                      # deben pasar todas (corren en SQLite, no tocan tu base)
 ruff check .
 
 # 3. Variables
 copy .env.example .env         # y llena los valores
+
+# 3b. Base de datos local y primer administrador
+docker compose up -d db        # PostgreSQL local (detén antes otro PostgreSQL que use el puerto 5432)
+alembic upgrade head           # crea las tablas
+python -m app.crear_admin      # pide nombre, correo y contraseña por teclado
+uvicorn app.main:app --reload  # http://localhost:8000/salud
 
 # 4. Skill de diseño (dentro de Claude Code)
 #   /plugin install frontend-design@claude-plugins-official
@@ -90,6 +101,30 @@ uvx --python 3.12 bandit -r app -q
 ```
 
 (`uvx` viene con [uv](https://docs.astral.sh/uv/); baja Python 3.12 aparte sin tocar tu 3.15.)
+
+**Pruebas contra PostgreSQL.** El CI corre las pruebas en SQLite. Antes de un PR que
+toque la base de datos, córrelas también contra PostgreSQL, en una base aparte (las
+pruebas borran sus tablas):
+
+```powershell
+docker compose exec db createdb -U asesor asesor_pruebas     # solo la primera vez
+$env:PRUEBAS_DATABASE_URL = "postgresql+psycopg://asesor:asesor_local@127.0.0.1:5432/asesor_pruebas"
+pytest -q
+Remove-Item Env:PRUEBAS_DATABASE_URL
+```
+
+**Primer administrador en producción.** Render gratis no tiene consola. Se crea desde
+el PC, apuntando esa terminal a la base de Supabase:
+
+```powershell
+$env:DATABASE_URL = "<la dirección de Supabase>"   # solo en esta terminal; no la guardes en archivos
+python -m app.crear_admin
+Remove-Item Env:DATABASE_URL
+```
+
+Los demás usuarios los crea el administrador desde la app. Si alguien olvida su
+contraseña o queda bloqueado, el administrador le pone una clave temporal y la persona
+la cambia al entrar.
 
 **Docker en el PC:** `/probar-imagen` construye y prueba la misma imagen que usa
 Render antes de cada PR; `docker compose up -d db` levanta PostgreSQL local; y el

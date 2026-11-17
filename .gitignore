@@ -22,3 +22,6 @@ Thumbs.db
 
 # Archivos de prueba subidos en local
 uploads/
+
+# Archivos temporales de Word
+~$*

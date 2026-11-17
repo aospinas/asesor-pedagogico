@@ -99,8 +99,25 @@ ruff check . ; ruff format --check .
 pip-audit -r requirements.txt         # el CI falla si hay dependencias vulnerables
 uvx --python 3.12 bandit -r app -q    # en 3.15 bandit no instala (le falta PyYAML)
 docker compose up -d db               # PostgreSQL local (DATABASE_URL de .env.example)
+alembic upgrade head                  # aplica las migraciones a la base de DATABASE_URL
+alembic revision --autogenerate -m "texto"   # migración nueva a partir de app/modelos.py
+python -m app.crear_admin             # primer administrador (pide los datos por teclado)
+python -m app.api.rutas               # imprime la tabla de docs/api.md para regenerarla
 uvicorn app.main:app --reload         # la API no publica /docs ni /redoc; prueba con /salud
 ```
+
+**Base de datos y pruebas:** `pytest` corre en SQLite en memoria y nunca toca la
+base real (`tests/conftest.py` fija las variables antes de importar la app). Antes
+de un PR que toque `app/modelos.py` o consultas, corre también contra PostgreSQL,
+en una base que termine en `_pruebas` (las pruebas borran sus tablas):
+
+```powershell
+$env:PRUEBAS_DATABASE_URL = "postgresql+psycopg://asesor:asesor_local@127.0.0.1:5432/asesor_pruebas"
+pytest -q ; Remove-Item Env:PRUEBAS_DATABASE_URL
+```
+
+Usa `127.0.0.1`, no `localhost`: en este PC `localhost` tarda 30 segundos por conexión.
+Un cambio en `app/modelos.py` lleva su migración; `tests/test_migraciones.py` falla si no coinciden.
 
 **Dependencias:** se editan `requirements.in` / `requirements-dev.in`, nunca los
 `.txt` a mano. Los `.txt` se regeneran con uv:
@@ -146,9 +163,20 @@ Puntos que hay que conocer antes de tocar código:
   usuario sin privilegios. Si la app necesita otra carpeta en producción, hay
   que agregarla ahí. Las variables de producción se declaran en `render.yaml`
   además de `.env.example`.
-- **Estado actual:** solo existen el contrato base (`esquemas.py`), el cálculo
-  de la nota y la ruta `/salud`. Los demás paquetes de `app/` están vacíos y se
-  llenan en el orden de `docs/arranque-claude-code.md`.
+- **Rutas y roles:** toda ruta nueva se agrega primero a la tabla de
+  `app/api/rutas.py` (y a `docs/api.md`) y se registra con
+  `app.api.seguridad.ruta(router, metodo, camino)`, que le pone los roles de la
+  tabla. Con `@app.get` directo la ruta queda sin control de acceso y
+  `tests/test_acceso.py` falla. El usuario de la sesión se recibe con el tipo
+  `Actual` y la base con `Db` (los dos en `app/api/seguridad.py`).
+- **Auditoría:** todo cambio de datos llama a `app.auditoria.registro.registrar`
+  en la misma transacción. Rechaza nombres de datos que parezcan secretos.
+- **Errores:** los mensajes para el usuario van en español; los de validación se
+  traducen en `app/mensajes.py` y nunca devuelven lo que la persona escribió.
+- **Estado actual:** existen el contrato (`esquemas.py`), el cálculo de la nota y
+  el módulo auth (sesión, usuarios, auditoría, tablas y migraciones). Los
+  paquetes `sandbox`, `rubricas`, `informes` e `ia` están vacíos y se llenan en
+  el orden de `docs/arranque-claude-code.md`.
 
 ## Guardrails automáticos
 

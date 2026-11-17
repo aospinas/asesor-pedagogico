@@ -1,6 +1,7 @@
 # Base de datos para desarrollo en el PC (no se usa en Render: allá va Supabase).
 # Arranca con:  docker compose up -d db
-# Y en .env:    DATABASE_URL=postgresql+psycopg://asesor:asesor_local@localhost:5432/asesor
+# Y en .env:    DATABASE_URL=postgresql+psycopg://asesor:asesor_local@127.0.0.1:5432/asesor
+#               (127.0.0.1 y no localhost: en Windows localhost tarda 30 s por conexión)
 #
 # La app se corre con uvicorn desde el .venv, no dentro de un contenedor, para que
 # el sandbox en modo docker use el Docker del PC sin montar el socket de Docker

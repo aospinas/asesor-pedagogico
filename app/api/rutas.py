@@ -7,6 +7,8 @@ arma esa tabla; el control de acceso de verdad lo hace el módulo de login.
 - `publica=True`: se puede usar sin sesión.
 - `solo_dueno=True`: el estudiante solo entra si el recurso es suyo; el backend
   lo revisa en cada consulta. A los demás roles no les aplica.
+- `solo_publicado=True`: al estudiante solo se le muestra lo que sale de
+  evaluaciones ya publicadas (RNF-09).
 """
 
 from dataclasses import dataclass
@@ -27,10 +29,13 @@ class Ruta:
     rf: tuple[str, ...] = ()
     publica: bool = False
     solo_dueno: bool = False
+    solo_publicado: bool = False
 
 
-def _r(metodo, ruta, roles, descripcion, rf=(), *, publica=False, solo_dueno=False) -> Ruta:
-    return Ruta(metodo, ruta, frozenset(roles), descripcion, tuple(rf), publica, solo_dueno)
+def _r(
+    metodo, ruta, roles, descripcion, rf=(), *, publica=False, solo_dueno=False, solo_publicado=False
+) -> Ruta:
+    return Ruta(metodo, ruta, frozenset(roles), descripcion, tuple(rf), publica, solo_dueno, solo_publicado)
 
 
 RUTAS: tuple[Ruta, ...] = (
@@ -47,6 +52,13 @@ RUTAS: tuple[Ruta, ...] = (
     _r("GET", "/api/usuarios", [A], "Listar usuarios", ["RF-02"]),
     _r("POST", "/api/usuarios", [A], "Crear un usuario", ["RF-01", "RF-02"]),
     _r("PATCH", "/api/usuarios/{usuario_id}", [A], "Editar, desactivar o cambiar el rol", ["RF-02"]),
+    _r(
+        "POST",
+        "/api/usuarios/{usuario_id}/clave-temporal",
+        [A],
+        "Poner una clave temporal a quien olvidó la suya o quedó bloqueado",
+        ["RF-02"],
+    ),
     _r("GET", "/api/estudiantes", [D], "Listar estudiantes para abrir su portafolio o informe", ["RF-08"]),
     # --- Cohortes y laboratorios ---
     _r("GET", "/api/cohortes", TODOS, "Listar cohortes", ["RF-03"]),
@@ -139,9 +151,18 @@ RUTAS: tuple[Ruta, ...] = (
         "Ver la evaluación ya publicada",
         ["RNF-09"],
         solo_dueno=True,
+        solo_publicado=True,
     ),
     # --- Informe y mapa mental ---
-    _r("GET", "/api/informe/{estudiante_id}", [E, D], "Ver el informe integrado", ["RF-16"], solo_dueno=True),
+    _r(
+        "GET",
+        "/api/informe/{estudiante_id}",
+        [E, D],
+        "Ver el informe integrado",
+        ["RF-16"],
+        solo_dueno=True,
+        solo_publicado=True,
+    ),
     _r(
         "GET",
         "/api/informe/{estudiante_id}/pdf",
@@ -149,8 +170,17 @@ RUTAS: tuple[Ruta, ...] = (
         "Descargar el informe en PDF",
         ["RF-16"],
         solo_dueno=True,
+        solo_publicado=True,
     ),
-    _r("GET", "/api/mapa/{estudiante_id}", [E, D], "Ver el mapa mental", ["RF-17"], solo_dueno=True),
+    _r(
+        "GET",
+        "/api/mapa/{estudiante_id}",
+        [E, D],
+        "Ver el mapa mental",
+        ["RF-17"],
+        solo_dueno=True,
+        solo_publicado=True,
+    ),
     # --- Configuración de IA, costos y auditoría ---
     _r("GET", "/api/config-ia", [A], "Ver el proveedor y el modelo de IA", ["RF-19"]),
     _r("PUT", "/api/config-ia", [A], "Cambiar el proveedor y el modelo de IA", ["RF-19"]),
@@ -171,7 +201,9 @@ def quien(ruta: Ruta) -> str:
     nombres = []
     for rol in (E, D, A):
         if rol in ruta.roles:
-            suyo = " (solo lo suyo)" if rol is E and ruta.solo_dueno else ""
+            suyo = ""
+            if rol is E and ruta.solo_dueno:
+                suyo = " (solo lo suyo y ya publicado)" if ruta.solo_publicado else " (solo lo suyo)"
             nombres.append(_NOMBRES[rol] + suyo)
     return ", ".join(nombres)
 

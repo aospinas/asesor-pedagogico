@@ -22,6 +22,7 @@ from pydantic import (
     BeforeValidator,
     ConfigDict,
     Field,
+    IPvAnyAddress,
     StringConstraints,
     model_validator,
 )
@@ -190,6 +191,12 @@ class CambioContrasena(Estricto):
     nueva: ContrasenaNueva
 
 
+class ClaveTemporal(Estricto):
+    """El administrador le pone una clave temporal a quien olvidó la suya o quedó bloqueado."""
+
+    contrasena: ContrasenaNueva
+
+
 class UsuarioPublico(Estricto):
     """Lo único de un usuario que sale del backend. Nunca lleva la contraseña."""
 
@@ -199,6 +206,13 @@ class UsuarioPublico(Estricto):
     rol: Rol
     activo: bool
     foto_url: str | None = None
+
+
+class MiSesion(Estricto):
+    """Lo que recibe el navegador al entrar y en `GET /api/yo`."""
+
+    usuario: UsuarioPublico
+    debe_cambiar_contrasena: bool
 
 
 # ---------- Cohortes y laboratorios (RF-03) ----------
@@ -626,11 +640,13 @@ class ConfigIA(Estricto):
 
 
 class RegistroAuditoria(Estricto):
+    """Una fila de la auditoría. Los secretos se frenan al guardar, en app/auditoria/registro.py."""
+
     id: UUID
     usuario_id: UUID | None
     accion: str = Field(min_length=1)
     entidad: str = Field(min_length=1)
     entidad_id: str | None = None
     detalle: dict[str, Any] = Field(default_factory=dict)
-    ip: str | None = None
+    ip: IPvAnyAddress | None = None
     fecha: datetime
