@@ -102,8 +102,10 @@ etiqueta que dice por qué.
 ### 5. Proyecto y equipo
 
 - Abstract del proyecto, tecnologías, aportes.
-- Equipo: foto, nombre y rol de **Andrés Ospina Silva** (desarrollo, experiencia
-  en infraestructura crítica y monitoreo 24×7) y **Santiago Arias Aguirre**.
+- Equipo de **3 personas**: foto, nombre y rol de cada una. Por ahora se conocen
+  **Andrés Ospina Silva** (desarrollo, experiencia en infraestructura crítica y
+  monitoreo 24×7) y **Santiago Arias Aguirre**. Fotos, roles y la tercera persona
+  se completan al final del proyecto; mientras tanto van espacios marcados "[…]".
 - Enlace a la bitácora pública de uso de IA en el desarrollo.
 
 ## Lo que se debe evitar
