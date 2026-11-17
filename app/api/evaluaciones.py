@@ -28,7 +28,7 @@ from app.esquemas import (
     TipoVerificacion,
     VerificacionCodigo,
 )
-from app.evaluador import github, motor
+from app.evaluador import github, motor, revision
 from app.ia import cliente
 from app.ia.cliente import ErrorIA
 from app.modelos import Entrega, EvaluacionCriterio, VerificacionCodigoFila
@@ -81,16 +81,31 @@ def obtener_config(db: Db) -> ConfigIA:
 # ---------- Respuesta ----------
 
 
-def motivos(evaluacion: EvaluacionFila, criterios: list[EvaluacionCriterio]) -> list[MotivoPrioridad]:
+def motivos(
+    db: Db, evaluacion: EvaluacionFila, criterios: list[EvaluacionCriterio], cache: dict | None = None
+) -> list[MotivoPrioridad]:
     """Por qué esta evaluación va primero en la bandeja (SRS sección 6)."""
-    lista = []
-    if any(e.get("encontrada") is False for c in criterios for e in c.evidencias):
-        lista.append(MotivoPrioridad.CITA_NO_ENCONTRADA)
-    if evaluacion.alerta_inyeccion:
-        lista.append(MotivoPrioridad.ALERTA_INYECCION)
-    if evaluacion.estado != EstadoEvaluacion.EN_PROCESO.value and any(c.nivel_ia is None for c in criterios):
-        lista.append(MotivoPrioridad.SIN_PROPUESTA)
-    return lista
+    terminada = evaluacion.estado != EstadoEvaluacion.EN_PROCESO.value
+    ids = revision.ids_de_rubrica(db, evaluacion.rubrica_version_id, cache) if terminada else []
+    return revision.motivos(evaluacion.alerta_inyeccion, criterios, terminada, ids)
+
+
+def verificaciones_de(db: Db, evaluacion: EvaluacionFila) -> list[VerificacionCodigo]:
+    return [
+        VerificacionCodigo(
+            tipo=TipoVerificacion(f.tipo),
+            comando=f.comando,
+            codigo_salida=f.codigo_salida,
+            salida=f.salida,
+            duracion_ms=f.duracion_ms,
+            tiempo_agotado=f.tiempo_agotado,
+        )
+        for f in db.scalars(
+            select(VerificacionCodigoFila)
+            .where(VerificacionCodigoFila.evaluacion_id == evaluacion.id)
+            .order_by(VerificacionCodigoFila.orden)
+        )
+    ]
 
 
 def a_esquema(db: Db, evaluacion: EvaluacionFila) -> Evaluacion:
@@ -122,21 +137,7 @@ def a_esquema(db: Db, evaluacion: EvaluacionFila) -> Evaluacion:
             )
             for c in criterios
         ],
-        verificaciones=[
-            VerificacionCodigo(
-                tipo=TipoVerificacion(f.tipo),
-                comando=f.comando,
-                codigo_salida=f.codigo_salida,
-                salida=f.salida,
-                duracion_ms=f.duracion_ms,
-                tiempo_agotado=f.tiempo_agotado,
-            )
-            for f in db.scalars(
-                select(VerificacionCodigoFila)
-                .where(VerificacionCodigoFila.evaluacion_id == evaluacion.id)
-                .order_by(VerificacionCodigoFila.orden)
-            )
-        ],
+        verificaciones=verificaciones_de(db, evaluacion),
         nota_preliminar=evaluacion.nota_preliminar,
         nota_final=evaluacion.nota_final,
         tokens_entrada=evaluacion.tokens_entrada,
@@ -147,7 +148,7 @@ def a_esquema(db: Db, evaluacion: EvaluacionFila) -> Evaluacion:
         aprobada_por=evaluacion.aprobada_por,
         fecha_aprobacion=evaluacion.fecha_aprobacion,
         fecha_publicacion=evaluacion.fecha_publicacion,
-        motivos=motivos(evaluacion, criterios),
+        motivos=motivos(db, evaluacion, criterios),
         aviso=evaluacion.aviso,
     )
 

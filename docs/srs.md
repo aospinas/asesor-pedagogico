@@ -236,10 +236,10 @@ Trece tablas en PostgreSQL. Las rúbricas y las evaluaciones nunca se sobrescrib
 | `rubrica_versiones` | id, rubrica\_id, numero, estructura, valida, errores, origen, archivo\_sha256, prompt\_version, modelo, tokens\_entrada, tokens\_salida, creada\_por, fecha | Versiones inmutables con competencias, criterios, niveles y pesos. Las que convierte la IA quedan por confirmar hasta que el docente las guarda (D-16) |
 | `entregas` | id, estudiante\_id, laboratorio\_id, rubrica\_version\_id, enlace\_github, sha256\_informe (único por estudiante y laboratorio), fecha | La entrega queda amarrada a la versión de rúbrica (F2) |
 | `evidencias` | id, entrega\_id, tipo (pdf, codigo, imagen, diapositivas), nombre, sha256, tamano\_bytes, tipo\_mime, ruta\_storage, texto\_extraido (JSON), resumen, fecha | Archivos y su huella digital (D-17) |
-| `evaluaciones` | id, entrega\_id, rubrica\_version\_id, lanzada\_por, proveedor, modelo, version\_prompt, estado, nota\_preliminar, nota\_final, tokens\_entrada, tokens\_salida, costo\_usd, alerta\_inyeccion, reglas\_inyeccion, aviso, fecha, actualizada, aprobada\_por, fecha\_aprobacion, fecha\_publicacion | La traza principal (C6, D-19) |
+| `evaluaciones` | id, entrega\_id, rubrica\_version\_id, lanzada\_por, proveedor, modelo, version\_prompt, estado, nota\_preliminar, nota\_final, tokens\_entrada, tokens\_salida, costo\_usd, alerta\_inyeccion, reglas\_inyeccion, aviso, prioridad, fecha, actualizada, aprobada\_por, fecha\_aprobacion, fecha\_publicacion | La traza principal (C6, D-19); `prioridad` ordena la bandeja (D-21) |
 | `evaluacion_criterios` | id, evaluacion\_id, criterio\_id, orden, nivel\_ia, nivel\_final, justificacion, evidencias (JSON, cada cita con su marca de encontrada), fortalezas, debilidades, recomendaciones, intentos | Resultado por criterio (D-19) |
 | `verificaciones_codigo` | id, evaluacion\_id, orden, tipo (sintaxis, estatico, pruebas), comando, codigo\_salida, salida, duracion\_ms, tiempo\_agotado | Resultados del sandbox (C3, D-20) |
-| `revisiones_docente` | id, evaluacion\_id, docente\_id, accion, valor\_anterior, valor\_nuevo, justificacion, fecha | Human in the loop |
+| `revisiones_docente` | id, evaluacion\_id, docente\_id, accion, criterio\_id, valor\_anterior, valor\_nuevo, justificacion, fecha | Human in the loop; es la traza de la pestaña "Traza" (D-21) |
 | `auditoria` | id, usuario\_id, accion, entidad, entidad\_id, detalle\_json, ip, fecha | Registro de todo cambio (OWASP A09) |
 | `config_ia` | id, proveedor, modelo, base\_url, precio\_entrada\_usd, precio\_salida\_usd, actualizado\_por, fecha | Proveedor configurable (C4); manda la última fila y, si no hay, las variables de entorno. La llave va en variables de entorno, no aquí (D-19) |
 
@@ -550,7 +550,7 @@ Cada punto del enunciado tiene su requisito, el módulo donde vive y la prueba q
 | F1 Entrada de información | RF-03, RF-07 | `app/api/laboratorios.py`, `app/api/entregas.py` | `tests/test_laboratorios.py`; `tests/test_entregas.py`: PDF sin texto rechazado | Hecho |
 | F2 Portafolio académico | RF-06, RF-08 | `app/api/portafolio.py` | `tests/test_portafolio.py`: entrega guarda versión de rúbrica | Hecho |
 | F3 Gestión de rúbricas | RF-04, RF-05 | `app/rubricas/` | `tests/test_rubricas.py`: pesos que suman 90 % bloquean | Hecho |
-| F4 Evaluación inteligente | RF-09 a RF-14 | `app/evaluador/` | `tests/test_evaluador.py` con respuesta de IA simulada; `tests/test_evaluador_sandbox.py` con el sandbox conectado | En curso: RF-09 a RF-13 hechos (D-19, D-20); RF-14 con la revisión docente |
+| F4 Evaluación inteligente | RF-09 a RF-14 | `app/evaluador/` | `tests/test_evaluador.py` con respuesta de IA simulada; `tests/test_evaluador_sandbox.py` con el sandbox conectado | Hecho (D-19, D-20, D-21; la pantalla de revisión va con el frontend) |
 | F5 Informe integrado | RF-16 | `app/informes/` | `tests/test_informe.py`: PDF generado con 2 cohortes | Pendiente |
 | F6 Mapa mental | RF-17 | `frontend/src/mapa/`, `app/api/mapa.py` | `tests/test_mapa.py`: JSON con temas, labs y nivel | Pendiente |
 | F7 Proyecto y equipo | RF-18 | `frontend/src/paginas/Proyecto.tsx` | Revisión manual | Pendiente |
@@ -559,7 +559,7 @@ Cada punto del enunciado tiene su requisito, el módulo donde vive y la prueba q
 | C3 Verificación del código | RF-10, RNF-03 | `app/sandbox/` | `tests/test_sandbox.py`: red, ciclo infinito, memoria, entorno | Hecho |
 | C4 Modelos configurables | RF-19, RF-20, RNF-04, RNF-14 | `app/ia/cliente.py`, `app/api/config_ia.py` | `tests/test_cliente_ia.py` con los 3 proveedores simulados; `tests/test_config_ia.py`: configuración, precios por modelo y panel de costos | Hecho (D-19) |
 | C5 Despliegue y calidad | RF-01, RF-02, RNF-05 a RNF-07, RNF-10 a RNF-12 | `Dockerfile`, `.github/workflows/ci.yml` | `tests/test_acceso.py` + CI en verde + URL pública | Pendiente |
-| C6 Trazabilidad y supervisión | RF-12, RF-14, RF-15, RNF-08, RNF-09 | `app/auditoria/`, pantalla de revisión | `tests/test_traza.py`: cambio de nivel queda auditado | Pendiente |
+| C6 Trazabilidad y supervisión | RF-12, RF-14, RF-15, RNF-08, RNF-09 | `app/auditoria/`, `app/api/revision.py`, pantalla de revisión | `tests/test_traza.py`: cambio de nivel queda auditado; `tests/test_revision.py`: el estudiante solo ve lo suyo y publicado | API hecha (D-21); falta la pantalla |
 
 ## 14. Riesgos, limitaciones y costos
 

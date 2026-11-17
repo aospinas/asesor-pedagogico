@@ -211,6 +211,9 @@ class Evaluacion(Base):
     reglas_inyeccion: Mapped[list[str]] = mapped_column(JSON, default=list)
     # Aviso para el docente si algo no salió (texto nuestro, nunca la respuesta de la IA)
     aviso: Mapped[str | None] = mapped_column(String(300), default=None)
+    # Cuántos motivos tiene para ir primero en la bandeja (cita no encontrada, alerta de
+    # inyección, sin propuesta). Se guarda para ordenar y paginar en la base (D-21).
+    prioridad: Mapped[int] = mapped_column(Integer, default=0, index=True)
     fecha: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_ahora, index=True)
     actualizada: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_ahora)
     aprobada_por: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("usuarios.id"), default=None)
@@ -239,6 +242,23 @@ class EvaluacionCriterio(Base):
     debilidades: Mapped[list[str]] = mapped_column(JSON, default=list)
     recomendaciones: Mapped[list[str]] = mapped_column(JSON, default=list)
     intentos: Mapped[int] = mapped_column(Integer, default=0)
+
+
+class RevisionDocenteFila(Base):
+    """Una acción del docente sobre una evaluación (RF-14), con el valor anterior y el nuevo.
+    Es la traza que ve la pestaña "Traza" (RF-15). Nunca se edita ni se borra."""
+
+    __tablename__ = "revisiones_docente"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    evaluacion_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("evaluaciones.id"), index=True)
+    docente_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("usuarios.id"))
+    accion: Mapped[str] = mapped_column(String(30))
+    criterio_id: Mapped[str | None] = mapped_column(String(40), default=None)
+    valor_anterior: Mapped[str | None] = mapped_column(Text, default=None)
+    valor_nuevo: Mapped[str | None] = mapped_column(Text, default=None)
+    justificacion: Mapped[str | None] = mapped_column(Text, default=None)
+    fecha: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_ahora)
 
 
 class VerificacionCodigoFila(Base):

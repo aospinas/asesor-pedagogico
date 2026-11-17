@@ -304,6 +304,35 @@ class _GitHubSimulado:
 simulada_github = _GitHubSimulado()
 
 
+@pytest.fixture
+def caso(entrar, laboratorio, rubrica_lista, almacen, ia_evaluador):
+    """(docente, estudiante dueño, entrega con informe y ZIP) para la revisión docente."""
+    from archivos_prueba import zip_codigo
+    from test_entregas import subir
+
+    estudiante = entrar("estudiante")
+    respuesta = subir(estudiante, laboratorio, codigo=zip_codigo())
+    assert respuesta.status_code == 201, respuesta.text
+    return entrar("docente"), estudiante, respuesta.json()
+
+
+@pytest.fixture
+def evaluada(caso):
+    """(docente, evaluación en revisión con nota 5.0: 'alto' en los 3 criterios)."""
+    from test_evaluador import evaluar
+
+    docente, _, entrega_json = caso
+    resultado = evaluar(docente, entrega_json)
+    assert resultado["estado"] == "en_revision"
+    return docente, resultado
+
+
+@pytest.fixture
+def dueno(caso):
+    """El estudiante dueño de la entrega de `caso` / `evaluada`, con su sesión abierta."""
+    return caso[1]
+
+
 class _SandboxSimulado:
     """El sandbox de mentira: devuelve `respuesta` (lista de VerificacionCodigo o una
     excepción) y guarda con qué archivos lo llamaron. El de verdad está en test_sandbox.py."""

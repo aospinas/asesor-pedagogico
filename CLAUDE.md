@@ -180,7 +180,9 @@ Puntos que hay que conocer antes de tocar código:
   laboratorios, carga con IA y versiones) y el de entregas (subida, portafolio,
   almacén de archivos), el evaluador (motor, configuración de IA, costos; D-19) y el
   sandbox (`app/sandbox/`, D-18), que devuelve `list[VerificacionCodigo]` con
-  `verificar(archivos)`; el motor del evaluador lo llama (D-20). El paquete `informes`
+  `verificar(archivos)`; el motor del evaluador lo llama (D-20). Y la revisión del docente
+  (`app/api/revision.py` y `app/evaluador/revision.py`, D-21): bandeja, ajustes con la nota
+  recalculada, aprobar, publicar, traza y la vista del estudiante. El paquete `informes`
   está vacío y se llena en el orden de `docs/arranque-claude-code.md`.
 - **Cliente de IA:** `app/ia/cliente.py`. `configuracion(db)` toma la última fila de
   `config_ia` y, si no hay, las variables `LLM_*`. Con OpenAI manda
