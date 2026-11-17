@@ -516,6 +516,7 @@ def test_matriz_red_entorno_y_procesos_todas_pasan(hostil):
 @pytest.mark.parametrize("modo", MODOS)
 def test_matriz_ciclo_infinito_se_corta(modo):
     archivos = _archivos(**{"test_ciclo.py": "def test_ciclo():\n    while True:\n        pass\n"})
+    antes = _contenedores_sandbox() if modo == "docker" else set()
     inicio = time.monotonic()
     resultado = _pruebas(verificar(archivos, _config(modo, tiempo_seg=15)))
     assert resultado.tiempo_agotado
@@ -523,13 +524,23 @@ def test_matriz_ciclo_infinito_se_corta(modo):
     assert resultado.salida.startswith(sandbox.AGOTADO)
     assert time.monotonic() - inicio < 40
     if modo == "docker":
-        vivos = subprocess.run(
-            ["docker", "ps", "-q", "--filter", "name=asesor-sandbox-"],  # noqa: S607
-            capture_output=True,
-            text=True,
-            check=False,
-        )
-        assert not vivos.stdout.strip()
+        # docker kill + --rm tarda un momento en quitarlo. Solo cuentan los contenedores
+        # nuevos: otra corrida del sandbox en el mismo equipo no hace fallar esta prueba.
+        limite = time.monotonic() + 15
+        while (nuevos := _contenedores_sandbox() - antes) and time.monotonic() < limite:
+            time.sleep(0.5)
+        assert not nuevos
+
+
+def _contenedores_sandbox() -> set[str]:
+    """Nombres de los contenedores del sandbox que siguen existiendo (vivos o saliendo)."""
+    hecho = subprocess.run(
+        ["docker", "ps", "-a", "--format", "{{.Names}}", "--filter", "name=asesor-sandbox-"],  # noqa: S607
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    return set(hecho.stdout.split())
 
 
 @sin_modos
@@ -575,6 +586,70 @@ def test_caso_normal_sintaxis_ruff_y_pytest(modo):
     # Las rutas salen relativas: ni la carpeta interna del sandbox ni la del equipo
     for verificacion in (sintaxis, estilo, seguridad, pruebas):
         assert "sandbox-" not in verificacion.salida
+
+
+IMPOSTOR = "import json, sys\nprint(json.dumps([]))\nprint('1 passed')\nsys.exit(0)\n"
+
+
+@sin_modos
+@pytest.mark.parametrize("modo", MODOS)
+def test_entrega_no_puede_suplantar_a_ruff_ni_a_pytest(modo):
+    """Un ruff.py, ruff/__main__.py o pytest.py de la entrega no reemplaza al instalado.
+
+    Si se colara, "revisar" ejecutaría código del estudiante (en Render, sin gancho y con red)
+    y podría decir "sin hallazgos" o "todo pasa" a su gusto."""
+    archivos = _archivos(
+        **{
+            "ruff.py": IMPOSTOR,
+            "ruff/__init__.py": IMPOSTOR,
+            "ruff/__main__.py": IMPOSTOR,
+            "pytest.py": IMPOSTOR,
+            "_pytest/__init__.py": IMPOSTOR,
+            "main.py": "import os\n\nx = eval('1')\n",
+            "test_main.py": "def test_mal():\n    assert 1 == 2\n",
+        }
+    )
+    sintaxis, estilo, seguridad, pruebas = verificar(archivos, _config(modo))
+    assert "F401" in estilo.salida
+    assert "S307" in seguridad.salida
+    assert seguridad.codigo_salida == 1
+    assert pruebas.codigo_salida == 1
+    assert "1 failed" in pruebas.salida
+
+
+def test_binario_de_ruff_dentro_de_la_entrega_se_rechaza(monkeypatch, tmp_path):
+    import ruff.__main__
+
+    monkeypatch.setattr(ruff.__main__, "find_ruff_bin", lambda: str(tmp_path / "ruff"))
+    with pytest.raises(RuntimeError):
+        lanzador.binario_ruff(str(tmp_path))
+
+
+def test_binario_de_ruff_es_el_instalado(tmp_path):
+    binario = lanzador.binario_ruff(str(tmp_path))
+    assert os.path.isabs(binario)
+    assert not binario.startswith(str(tmp_path))
+
+
+def test_ruff_sin_salida_no_es_sin_hallazgos(tmp_path):
+    """Si ruff no imprime su lista (falló o no era ruff), se dice que no pudo revisar."""
+    resultado = lanzador.revisar_ruff(
+        str(tmp_path), lanzador.RUFF_SEGURIDAD, por_tipo=False, binario=sys.executable
+    )
+    assert resultado["codigo_salida"] == 2
+    assert resultado["salida"].startswith("ruff no pudo revisar el código.")
+
+
+def test_lanzador_se_niega_a_correr_sin_aislamiento():
+    hecho = subprocess.run(
+        [sys.executable, "-c", ejecutar._lanzador()],
+        input=b"{}",
+        capture_output=True,
+        check=False,
+        timeout=30,
+    )
+    assert hecho.returncode != 0
+    assert b"python -I" in hecho.stderr
 
 
 @sin_modos

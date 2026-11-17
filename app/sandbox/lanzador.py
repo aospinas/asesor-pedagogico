@@ -214,10 +214,27 @@ def resumir_ruff(hallazgos: list[dict], carpeta: str, *, por_tipo: bool) -> str:
     return "\n".join(texto)
 
 
-def revisar_ruff(carpeta: str, reglas: tuple[str, ...], *, por_tipo: bool) -> dict:
+def binario_ruff(carpeta: str) -> str:
+    """Ruta absoluta del ejecutable de ruff instalado, nunca uno que venga en la entrega.
+
+    No se usa `python -m ruff`: con -m, Python busca primero en la carpeta de trabajo, y un
+    `ruff.py` o `ruff/__main__.py` del estudiante se ejecutaría en el paso que no debe
+    ejecutar nada. El paquete `ruff` se importa aquí sin riesgo porque el lanzador corre con
+    -I (la carpeta de trabajo no está en sys.path), y se comprueba que quede fuera de la entrega.
+    """
+    from ruff.__main__ import find_ruff_bin
+
+    binario = os.path.realpath(find_ruff_bin())
+    raiz = os.path.realpath(carpeta)
+    if not os.path.isabs(binario) or binario == raiz or binario.startswith(raiz + os.sep):
+        raise RuntimeError("El ejecutable de ruff no es el instalado.")
+    return binario
+
+
+def revisar_ruff(carpeta: str, reglas: tuple[str, ...], *, por_tipo: bool, binario: str) -> dict:
     """ruff no ejecuta el código. --isolated: no lee la configuración que traiga la entrega."""
     seleccion = ",".join(reglas)
-    comando = [sys.executable, "-m", "ruff", "check", "--isolated", "--no-cache"]
+    comando = [binario, "check", "--isolated", "--no-cache"]
     comando += ["--select", seleccion, "--output-format", "json", "--target-version", "py312", "."]
     entorno = {"PATH": os.environ.get("PATH", "/usr/bin:/bin"), "HOME": carpeta, "RAYON_NUM_THREADS": "2"}
     inicio = time.monotonic()
@@ -225,11 +242,15 @@ def revisar_ruff(carpeta: str, reglas: tuple[str, ...], *, por_tipo: bool) -> di
     duracion = int((time.monotonic() - inicio) * 1000)
     visible = f"ruff check --isolated --select {seleccion}"
     try:
-        hallazgos = json.loads(hecho.stdout or "[]")
-    except json.JSONDecodeError:
+        # Con --output-format json ruff siempre imprime una lista ("[]" si no hay nada):
+        # una salida vacía o de otro tipo es una falla, nunca "sin hallazgos".
+        hallazgos = json.loads(hecho.stdout)
+        if not isinstance(hallazgos, list) or not all(isinstance(h, dict) for h in hallazgos):
+            raise ValueError
+    except ValueError:  # json.JSONDecodeError también es ValueError
         return {
             "comando": visible,
-            "codigo_salida": hecho.returncode,
+            "codigo_salida": hecho.returncode if hecho.returncode > 1 else 2,
             "salida": "ruff no pudo revisar el código.\n" + (hecho.stderr or "")[-2000:],
             "duracion_ms": duracion,
         }
@@ -245,10 +266,11 @@ def revisar_ruff(carpeta: str, reglas: tuple[str, ...], *, por_tipo: bool) -> di
 
 def revisar(carpeta: str, archivos: list[dict]) -> dict:
     rutas_py = sorted(a["ruta"] for a in archivos if a["ruta"].endswith(".py"))
+    binario = binario_ruff(carpeta)
     return {
         "sintaxis": revisar_sintaxis(carpeta, rutas_py),
-        "estilo": revisar_ruff(carpeta, RUFF_ESTILO, por_tipo=True),
-        "seguridad": revisar_ruff(carpeta, RUFF_SEGURIDAD, por_tipo=False),
+        "estilo": revisar_ruff(carpeta, RUFF_ESTILO, por_tipo=True, binario=binario),
+        "seguridad": revisar_ruff(carpeta, RUFF_SEGURIDAD, por_tipo=False, binario=binario),
     }
 
 
@@ -309,6 +331,10 @@ def correr_pruebas(carpeta: str) -> int:
 
 
 def main() -> int:
+    # Sin -I (o -P) la carpeta de trabajo entra a sys.path y un `pytest.py` o `ruff/` de la
+    # entrega reemplazaría al instalado: el lanzador no corre así.
+    if not (sys.flags.isolated and sys.flags.safe_path):
+        raise RuntimeError("El lanzador del sandbox debe correr con python -I.")
     datos = json.loads(sys.stdin.buffer.read().decode("utf-8"))
     carpeta = datos.get("carpeta") or tempfile.mkdtemp(prefix="sandbox-")
     escribir_archivos(carpeta, datos["archivos"])
