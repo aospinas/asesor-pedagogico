@@ -72,6 +72,15 @@ ESPERADAS_EN_EVALUADOR = {
     ("POST", "/api/config-ia/probar"),
     ("GET", "/api/costos"),
 }
+ESPERADAS_EN_REVISION = {
+    ("GET", "/api/evaluaciones"),
+    ("POST", "/api/evaluaciones/{evaluacion_id}/ajustes"),
+    ("PATCH", "/api/evaluaciones/{evaluacion_id}/retroalimentacion"),
+    ("POST", "/api/evaluaciones/{evaluacion_id}/aprobar"),
+    ("POST", "/api/evaluaciones/{evaluacion_id}/publicar"),
+    ("GET", "/api/evaluaciones/{evaluacion_id}/traza"),
+    ("GET", "/api/evaluaciones/{evaluacion_id}/publicada"),
+}
 
 
 def camino(ruta: str) -> str:
@@ -84,7 +93,13 @@ def test_no_hay_rutas_por_fuera_de_la_tabla():
 
 
 def test_las_rutas_de_este_modulo_ya_existen():
-    esperadas = ESPERADAS_EN_AUTH | ESPERADAS_EN_RUBRICAS | ESPERADAS_EN_ENTREGAS | ESPERADAS_EN_EVALUADOR
+    esperadas = (
+        ESPERADAS_EN_AUTH
+        | ESPERADAS_EN_RUBRICAS
+        | ESPERADAS_EN_ENTREGAS
+        | ESPERADAS_EN_EVALUADOR
+        | ESPERADAS_EN_REVISION
+    )
     assert set(CONSTRUIDAS) >= esperadas
 
 

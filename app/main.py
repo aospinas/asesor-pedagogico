@@ -23,6 +23,7 @@ from app.api import (
     evaluaciones,
     laboratorios,
     portafolio,
+    revision,
     rubricas,
     sesion,
     usuarios,
@@ -217,4 +218,5 @@ app.include_router(rubricas.router)
 app.include_router(entregas.router)
 app.include_router(portafolio.router)
 app.include_router(evaluaciones.router)
+app.include_router(revision.router)
 app.include_router(config_ia.router)

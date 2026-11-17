@@ -53,7 +53,7 @@ from app.esquemas import (
     TipoEvidencia,
     VerificacionCodigo,
 )
-from app.evaluador import citas, imagenes, inyeccion, material
+from app.evaluador import citas, imagenes, inyeccion, material, revision
 from app.evaluador.nota import ErrorDeNota, calcular_nota
 from app.ia.cliente import ErrorIA, Imagen, Uso
 from app.modelos import (
@@ -504,6 +504,7 @@ def _evaluar(db: Session, evaluacion_id: uuid.UUID, contexto: Contexto) -> None:
 
     # 4 y 5. Un criterio a la vez, con sus citas verificadas
     niveles: dict[str, str | None] = {}
+    filas: list[EvaluacionCriterio] = []
     for orden, criterio in enumerate(rubrica.criterios):
         fila = EvaluacionCriterio(evaluacion_id=evaluacion.id, criterio_id=criterio.id, orden=orden)
         resultado, fila.intentos = _proponer(criterio, entrega_material, contexto, gasto)
@@ -526,6 +527,7 @@ def _evaluar(db: Session, evaluacion_id: uuid.UUID, contexto: Contexto) -> None:
             fila.recomendaciones = resultado.recomendaciones
         niveles[criterio.id] = fila.nivel_ia
         db.add(fila)
+        filas.append(fila)
         avance()  # el docente ve el avance criterio por criterio
 
     # 6. Nota calculada por el backend, solo si todos los criterios tienen nivel.
@@ -544,6 +546,8 @@ def _evaluar(db: Session, evaluacion_id: uuid.UUID, contexto: Contexto) -> None:
         .where(Evaluacion.id == evaluacion.id, Evaluacion.estado == EstadoEvaluacion.EN_PROCESO.value)
         .values(
             estado=estado,
+            # Para ordenar la bandeja del docente (D-21)
+            prioridad=len(revision.motivos(evaluacion.alerta_inyeccion, filas, terminada=True)),
             nota_preliminar=nota,
             aviso=" ".join(dict.fromkeys(avisos))[:300] or None,
             actualizada=ahora(),
