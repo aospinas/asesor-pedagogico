@@ -6,24 +6,32 @@ Defensas contra archivos hechos para tumbar el servidor (OWASP A08, LLM10):
 - Topes de tamaño, de páginas y de lo que ocupa un .docx al descomprimirse.
 - El .docx se lee con expresiones regulares sin retroceso sobre su XML, sin un
   lector de XML: así no hay entidades externas ni expansiones que atacar.
-- El PDF se lee en un proceso aparte con tiempo límite (y memoria limitada en
-  Linux): un PDF bomba mata ese proceso, no la app.
+- El PDF se lee en un proceso aparte con tiempo límite (app/archivos/pdf.py):
+  un PDF bomba mata ese proceso, no la app.
 - La lectura se corta al pasar el máximo de caracteres que puede ir a la IA.
 """
 
 import hashlib
 import html
 import io
-import multiprocessing
-import queue
 import re
-import sys
-import time
 import zipfile
-import zlib
 from dataclasses import dataclass
 
+from app.archivos import ArchivoMuyGrande, ArchivoNoValido, pdf
+from app.archivos.zip import (
+    COMPRESIONES_PERMITIDAS,
+    ERRORES_DESCONOCIDOS,
+    ERRORES_ZIP,
+    error_inesperado,
+    es_zip,
+    revisar_entradas,
+    revisar_indice,
+)
+from app.archivos.zip import NO_ABRE as NO_ABRE_ZIP
 from app.esquemas import OrigenRubrica
+
+__all__ = ["ArchivoMuyGrande", "ArchivoNoValido", "extraer_texto", "revisar_largo"]
 
 MAXIMO_BYTES = 5 * 1024 * 1024  # 5 MB
 MAXIMO_PAGINAS = 30
@@ -31,14 +39,11 @@ MAXIMO_DESCOMPRIMIDO = 2 * 1024 * 1024  # lo que puede ocupar el XML de un .docx
 MAXIMO_CARACTERES = 40_000  # lo más que se manda a la IA; una rúbrica más larga se rechaza
 MINIMO_CARACTERES_PDF = 30  # menos que esto = PDF escaneado o vacío
 MINIMO_CARACTERES_DOCX = 10
-TIEMPO_PDF_SEG = 15
-MEMORIA_PDF_BYTES = 400 * 1024 * 1024  # solo se aplica en Linux (Render)
+MAXIMO_PARTES_DOCX = 2000  # archivos dentro del .docx
+TIEMPO_PDF_SEG = pdf.TIEMPO_SEG
 
 TIPOS_PERMITIDOS = "Sube la rúbrica en PDF, Word, texto o JSON."
 NO_ABRE_WORD = "No se pudo abrir el documento de Word."
-NO_ABRE_PDF = "No se pudo leer el PDF."
-PDF_PESADO = "El PDF es demasiado pesado para leerlo. Súbelo en Word o texto."
-PDF_LENTO = "El PDF tardó demasiado en leerse. Súbelo en Word o texto."
 
 _PARRAFO = re.compile(r"</w:p>")
 _CELDA = re.compile(r"</w:tc>")
@@ -46,17 +51,6 @@ _TABULADOR = re.compile(r"<w:tab/>")
 # [^<>] y no [^>]: así la búsqueda se detiene en la siguiente etiqueta y no recorre
 # todo el documento por cada <w:t (eso tardaba horas con un archivo hecho a propósito).
 _TEXTO_W = re.compile(r"<w:t(?:\s[^<>]{0,300})?>([^<]*)</w:t>")
-
-# Errores que lanza zipfile con archivos cifrados, dañados o con compresión rara
-_ERRORES_ZIP = (zipfile.BadZipFile, RuntimeError, NotImplementedError, EOFError, zlib.error, OSError)
-
-
-class ArchivoNoValido(ValueError):
-    """El archivo no se puede usar. El mensaje es para el docente, en español."""
-
-
-class ArchivoMuyGrande(ArchivoNoValido):
-    """El archivo pesa más de MAXIMO_BYTES (la ruta responde 413)."""
 
 
 class RubricaMuyLarga(ArchivoNoValido):
@@ -79,9 +73,9 @@ def extraer_texto(contenido: bytes) -> Extraido:
         raise ArchivoMuyGrande(mensaje_muy_grande())
     huella = hashlib.sha256(contenido).hexdigest()
 
-    if contenido.startswith(b"%PDF-"):
+    if pdf.es_pdf(contenido):
         return Extraido(OrigenRubrica.PDF, _de_pdf(contenido), huella)
-    if contenido.startswith(b"PK\x03\x04"):
+    if es_zip(contenido):
         return Extraido(OrigenRubrica.DOCX, _de_docx(contenido), huella)
 
     texto = _de_texto(contenido)
@@ -89,80 +83,37 @@ def extraer_texto(contenido: bytes) -> Extraido:
     return Extraido(origen, texto, huella)
 
 
+def _muy_larga() -> RubricaMuyLarga:
+    return RubricaMuyLarga(
+        f"La rúbrica es muy larga (más de {MAXIMO_CARACTERES:,} caracteres). "
+        "Quita lo que no sea rúbrica o súbela en JSON.".replace(",", ".")
+    )
+
+
 def revisar_largo(texto: str) -> None:
     if len(texto) > MAXIMO_CARACTERES:
-        raise RubricaMuyLarga(
-            f"La rúbrica es muy larga (más de {MAXIMO_CARACTERES:,} caracteres). "
-            "Quita lo que no sea rúbrica o súbela en JSON.".replace(",", ".")
-        )
+        raise _muy_larga()
 
 
 # ---------- PDF ----------
 
 
-def _leer_pdf(contenido: bytes, cola) -> None:
-    """Corre en el proceso aparte. Devuelve ("ok", paginas) o ("error", mensaje)."""
-    try:
-        if sys.platform.startswith("linux"):
-            import resource
-
-            resource.setrlimit(resource.RLIMIT_AS, (MEMORIA_PDF_BYTES, MEMORIA_PDF_BYTES))
-        import pymupdf
-
-        with pymupdf.open(stream=contenido, filetype="pdf") as doc:
-            if doc.needs_pass:
-                cola.put(("error", "El PDF tiene contraseña. Súbelo sin contraseña."))
-                return
-            if doc.page_count > MAXIMO_PAGINAS:
-                cola.put(("error", f"El PDF tiene más de {MAXIMO_PAGINAS} páginas."))
-                return
-            paginas: list[str] = []
-            total = 0
-            for pagina in doc:
-                texto = pagina.get_text()
-                paginas.append(texto)
-                total += len(texto)
-                if total > MAXIMO_CARACTERES:  # no hace falta leer más: ya es muy larga
-                    break
-        cola.put(("ok", paginas))
-    except Exception:  # PyMuPDF lanza varios tipos según el daño del archivo
-        cola.put(("error", NO_ABRE_PDF))
-
-
 def _de_pdf(contenido: bytes) -> str:
-    contexto = multiprocessing.get_context("spawn")
-    cola = contexto.Queue()
-    proceso = contexto.Process(target=_leer_pdf, args=(contenido, cola), daemon=True)
-    limite = time.monotonic() + TIEMPO_PDF_SEG
-    proceso.start()
     try:
-        while True:
-            # El reloj se mira ANTES de cada espera y nunca se espera más de lo que queda:
-            # así el tiempo límite se cumple aunque el proceso responda muy rápido.
-            restante = limite - time.monotonic()
-            if restante <= 0:
-                estado, valor = "error", PDF_LENTO
-                break
-            try:
-                estado, valor = cola.get(timeout=min(0.2, restante))
-                break
-            except queue.Empty:
-                if not proceso.is_alive():  # murió sin responder: en Linux, por pasarse de memoria
-                    try:
-                        estado, valor = cola.get(timeout=0.5)
-                    except queue.Empty:
-                        estado, valor = "error", PDF_PESADO
-                    break
-    finally:
-        proceso.join(timeout=1)
-        if proceso.is_alive():
-            proceso.kill()
-            proceso.join()
-        cola.close()
-
-    if estado != "ok":
-        raise ArchivoNoValido(valor)
-    paginas: list[str] = valor
+        lectura = pdf.leer_paginas(
+            contenido,
+            maximo_paginas=MAXIMO_PAGINAS,
+            maximo_caracteres=MAXIMO_CARACTERES,
+            tiempo_seg=TIEMPO_PDF_SEG,
+        )
+    except ArchivoNoValido as error:
+        mensaje = str(error)
+        if mensaje in (pdf.PESADO, pdf.LENTO):
+            mensaje += " Súbelo en Word o texto."
+        raise ArchivoNoValido(mensaje) from None
+    if lectura.recortado:  # el texto pasaba del tope: la rúbrica es muy larga
+        raise _muy_larga()
+    paginas = lectura.paginas
     if sum(len(t.strip()) for t in paginas) < MINIMO_CARACTERES_PDF:
         raise ArchivoNoValido("El PDF no tiene texto legible (parece escaneado). Súbelo en Word o texto.")
     texto = "\n".join(f"[Página {i}]\n{t.strip()}" for i, t in enumerate(paginas, start=1) if t.strip())
@@ -175,19 +126,31 @@ def _de_pdf(contenido: bytes) -> str:
 
 def _de_docx(contenido: bytes) -> str:
     try:
+        revisar_indice(contenido, MAXIMO_PARTES_DOCX)  # antes de que zipfile lea el índice entero
+    except ArchivoNoValido as error:
+        raise ArchivoNoValido(NO_ABRE_WORD if str(error) == NO_ABRE_ZIP else str(error)) from None
+    try:
         with zipfile.ZipFile(io.BytesIO(contenido)) as z:
+            revisar_entradas(z.infolist(), len(contenido), NO_ABRE_WORD)
             try:
                 info = z.getinfo("word/document.xml")
             except KeyError:
                 raise ArchivoNoValido("El archivo no es un documento de Word (.docx).") from None
             if info.file_size > MAXIMO_DESCOMPRIMIDO:
                 raise ArchivoNoValido("El documento de Word es demasiado grande al abrirlo.")
+            # Igual que en el ZIP y el PPTX: solo compresión normal y sin contraseña. Con zstd
+            # (Python 3.14+) zipfile lanzaba ZstdError y la carga daba 500 (6.ª revisión).
+            if info.compress_type not in COMPRESIONES_PERMITIDAS or info.flag_bits & 0x1:
+                raise ArchivoNoValido(NO_ABRE_WORD)
             with z.open(info) as f:
                 # El tamaño que dice el zip puede mentir: se lee con tope igual.
                 xml = f.read(MAXIMO_DESCOMPRIMIDO + 1)
     except ArchivoNoValido:
         raise
-    except _ERRORES_ZIP:
+    except ERRORES_ZIP:
+        raise ArchivoNoValido(NO_ABRE_WORD) from None
+    except ERRORES_DESCONOCIDOS as error:
+        error_inesperado("un Word de rúbrica", error)
         raise ArchivoNoValido(NO_ABRE_WORD) from None
     if len(xml) > MAXIMO_DESCOMPRIMIDO:
         raise ArchivoNoValido("El documento de Word es demasiado grande al abrirlo.")

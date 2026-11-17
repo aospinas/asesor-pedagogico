@@ -29,6 +29,14 @@ class Ajustes(BaseSettings):
     llm_api_key: SecretStr = SecretStr("")
     llm_tiempo_seg: int = Field(default=60, ge=5, le=300)
 
+    # Archivos de las entregas (RNF-07). En el PC, una carpeta; en Render, Supabase Storage
+    # (el disco de Render se borra en cada despliegue).
+    almacen: Literal["local", "supabase"] = "local"
+    almacen_carpeta: str = "almacen_local"
+    supabase_url: str = ""
+    supabase_service_key: SecretStr = SecretStr("")
+    supabase_bucket: str = Field(default="evidencias", pattern=r"^[a-z0-9][a-z0-9_-]{0,62}$")
+
     @property
     def en_produccion(self) -> bool:
         return self.entorno == "produccion"

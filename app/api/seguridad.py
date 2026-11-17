@@ -34,7 +34,10 @@ PERMITIDAS_CON_CLAVE_TEMPORAL = {("GET", "/api/yo"), ("PUT", "/api/yo/contrasena
 
 _TABLA = {(r.metodo, r.ruta): r for r in RUTAS}
 
-limitador = Limiter(key_func=get_remote_address)
+# key_style="endpoint": el cupo se cuenta por ruta (`/api/portafolio/{estudiante_id}`) y no
+# por la dirección exacta. Con "url" (lo que trae slowapi), cada id tenía su propio
+# contador y probar ids al azar no tenía límite (cuarta revisión).
+limitador = Limiter(key_func=get_remote_address, key_style="endpoint")
 
 Db = Annotated[Session, Depends(obtener_db)]
 
@@ -115,6 +118,25 @@ def _leer_token(token: str | None) -> dict[str, Any] | None:
         )
     except jwt.InvalidTokenError:
         return None
+
+
+def clave_de_usuario(request: Request) -> str:
+    """Clave para los límites de frecuencia: el usuario de la sesión, o la IP si no hay.
+
+    Detrás del proxy de Render todos llegan con la misma IP: con la IP como clave, un
+    curso entero compartiría el mismo cupo y un solo estudiante podría gastarlo."""
+    datos = _leer_token(request.cookies.get(nombre_cookie()))
+    if datos and isinstance(datos.get("sub"), str):
+        return "usuario:" + datos["sub"]
+    return "ip:" + (ip_de(request) or "desconocida")
+
+
+def tiene_sesion_firmada(request: Request) -> bool:
+    """¿Trae una cookie de sesión firmada por la app y sin vencer? No consulta la base.
+
+    Sirve para frenar en el middleware las subidas grandes de quien no tiene cuenta,
+    antes de recibirlas. La revisión completa (usuario activo, rol) va después."""
+    return _leer_token(request.cookies.get(nombre_cookie())) is not None
 
 
 def usuario_actual(request: Request, db: Db) -> Usuario:

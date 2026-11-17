@@ -102,6 +102,7 @@ def cargar_rubrica(
     usuario_id = actual.id
     ip = seguridad.ip_de(request)
     buscar_laboratorio(db, laboratorio_id)
+    db.rollback()  # leer un PDF puede esperar turno: se suelta la conexión mientras tanto
     try:
         extraido = extraer.extraer_texto(archivo.file.read(extraer.MAXIMO_BYTES + 1))
     except extraer.ArchivoMuyGrande as error:

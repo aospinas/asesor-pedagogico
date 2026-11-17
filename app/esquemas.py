@@ -135,7 +135,7 @@ class TipoEvidencia(StrEnum):
     CODIGO = "codigo"
     IMAGEN = "imagen"
     DIAPOSITIVAS = "diapositivas"
-    VIDEO = "video"
+    VIDEO = "video"  # reservado: en esta versión no se acepta video (D-17)
 
 
 class TipoVerificacion(StrEnum):
@@ -418,6 +418,9 @@ class EvidenciaArchivo(Estricto):
     tipo: TipoEvidencia
     nombre: NombreArchivo
     sha256: str = Field(pattern=PATRON_SHA256)
+    tamano_bytes: int | None = Field(default=None, ge=0)
+    # Lo que se sacó del archivo, en corto: páginas, archivos de código, omitidos (RF-09)
+    resumen: str | None = Field(default=None, max_length=300)
 
 
 class Entrega(Estricto):
@@ -428,6 +431,35 @@ class Entrega(Estricto):
     enlace_github: str | None = Field(default=None, pattern=PATRON_REPO_GITHUB, max_length=200)
     evidencias: list[EvidenciaArchivo]
     fecha: datetime
+    rubrica_version_numero: int | None = Field(default=None, ge=1)
+
+
+class LaboratorioPortafolio(Estricto):
+    laboratorio_id: UUID
+    titulo: str
+    entregas: list[Entrega]  # de la más nueva a la más vieja
+
+
+class CohortePortafolio(Estricto):
+    cohorte_id: UUID
+    nombre: str
+    periodo: str
+    laboratorios: list[LaboratorioPortafolio]
+
+
+class Portafolio(Estricto):
+    """Portafolio de un estudiante, organizado por cohorte y laboratorio (RF-08)."""
+
+    estudiante_id: UUID
+    nombre: str
+    cohortes: list[CohortePortafolio]
+
+
+class EnlaceDescarga(Estricto):
+    """Enlace firmado para bajar un archivo; vence pronto (RNF-07)."""
+
+    url: str = Field(max_length=2000)
+    vence_en_seg: int = Field(gt=0)
 
 
 # ---------- Evaluaciones (RF-10 a RF-15, RNF-08) ----------

@@ -122,6 +122,12 @@ python -m app.crear_admin
 Remove-Item Env:DATABASE_URL
 ```
 
+**Archivos de las entregas en producción.** En Supabase: Storage → New bucket →
+nombre `evidencias`, **sin** marcar "Public bucket". En Render (Environment) van
+`SUPABASE_URL` (Project Settings → Data API → Project URL) y `SUPABASE_SERVICE_KEY`
+(Project Settings → API Keys → service_role). En el PC los archivos quedan en la
+carpeta `almacen_local/`, que no se sube a GitHub.
+
 Los demás usuarios los crea el administrador desde la app. Si alguien olvida su
 contraseña o queda bloqueado, el administrador le pone una clave temporal y la persona
 la cambia al entrar.

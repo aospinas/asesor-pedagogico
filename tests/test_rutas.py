@@ -13,6 +13,8 @@ PUBLICAS = {
     ("POST", "/api/sesion"),
     ("GET", "/api/proyecto"),
     ("GET", "/api/bitacora"),
+    # Enlace firmado del almacén local: sin token válido responde 404 (D-17, RNF-07)
+    ("GET", "/api/archivos/{token}"),
 }
 
 

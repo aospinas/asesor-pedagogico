@@ -54,6 +54,16 @@ ESPERADAS_EN_RUBRICAS = {
     ("PUT", "/api/laboratorios/{laboratorio_id}/rubrica"),
     ("GET", "/api/laboratorios/{laboratorio_id}/rubrica/versiones"),
 }
+ESPERADAS_EN_ENTREGAS = {
+    ("POST", "/api/entregas"),
+    ("GET", "/api/mis-entregas"),
+    ("GET", "/api/entregas/{entrega_id}"),
+    ("GET", "/api/laboratorios/{laboratorio_id}/entregas"),
+    ("GET", "/api/evidencias/{evidencia_id}/enlace"),
+    ("GET", "/api/archivos/{token}"),
+    ("GET", "/api/portafolio/{estudiante_id}"),
+    ("GET", "/api/estudiantes"),
+}
 
 
 def camino(ruta: str) -> str:
@@ -66,7 +76,7 @@ def test_no_hay_rutas_por_fuera_de_la_tabla():
 
 
 def test_las_rutas_de_este_modulo_ya_existen():
-    assert set(CONSTRUIDAS) >= ESPERADAS_EN_AUTH | ESPERADAS_EN_RUBRICAS
+    assert set(CONSTRUIDAS) >= ESPERADAS_EN_AUTH | ESPERADAS_EN_RUBRICAS | ESPERADAS_EN_ENTREGAS
 
 
 @pytest.mark.parametrize(("metodo", "ruta"), [c for c in CONSTRUIDAS if not TABLA[c].publica])

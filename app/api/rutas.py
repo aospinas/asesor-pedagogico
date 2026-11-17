@@ -111,6 +111,14 @@ RUTAS: tuple[Ruta, ...] = (
     ),
     _r(
         "GET",
+        "/api/archivos/{token}",
+        NADIE,
+        "Bajar un archivo con un enlace firmado que vence pronto (solo con almacén local)",
+        ["RNF-07"],
+        publica=True,
+    ),
+    _r(
+        "GET",
         "/api/portafolio/{estudiante_id}",
         [E, D],
         "Ver el portafolio de un estudiante",

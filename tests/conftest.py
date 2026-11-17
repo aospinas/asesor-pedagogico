@@ -158,6 +158,35 @@ def laboratorio(db):
 
 
 @pytest.fixture
+def rubrica_lista(db, laboratorio, crear_usuario):
+    """El laboratorio con una rúbrica válida y confirmada: ya se puede entregar."""
+    from app.esquemas import RubricaEstructura
+    from app.rubricas import versiones
+
+    autor = crear_usuario("docente", correo="autor.rubrica@umanizales.edu.co")
+    version = versiones.guardar_version(
+        db,
+        laboratorio.id,
+        RubricaEstructura.model_validate(_rubrica_de_prueba()),
+        origen="editor",
+        creada_por=autor.id,
+    )
+    db.commit()
+    return version
+
+
+@pytest.fixture
+def almacen(motor, tmp_path):
+    """Los archivos van a una carpeta temporal de la prueba (almacén local)."""
+    from app.almacen import AlmacenLocal
+    from app.api import entregas
+
+    local = AlmacenLocal(tmp_path / "almacen")
+    app.dependency_overrides[entregas._almacen] = lambda: local
+    return local
+
+
+@pytest.fixture
 def ia_simulada(motor):
     """Reemplaza la IA: devuelve lo que la prueba ponga en `respuesta` y guarda lo que se le pidió."""
     from app.api import rubricas
