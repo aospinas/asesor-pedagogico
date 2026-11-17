@@ -242,7 +242,7 @@ def _marcar_zip(contenido: bytes, *, cifrado: bool = False, metodo: int | None =
     return bytes(datos)
 
 
-@pytest.mark.parametrize("marca", [{"cifrado": True}, {"metodo": 99}])
+@pytest.mark.parametrize("marca", [{"cifrado": True}, {"metodo": 99}, {"metodo": 93}, {"metodo": 14}])
 def test_un_docx_cifrado_o_raro_da_un_aviso_y_no_un_500(entrar, laboratorio, ia_simulada, marca):
     contenido = _marcar_zip(docx(["Criterio uno con texto"]), **marca)
     r = _subir(entrar("docente"), laboratorio, "rubrica.docx", contenido)

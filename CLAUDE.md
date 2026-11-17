@@ -174,13 +174,19 @@ Puntos que hay que conocer antes de tocar código:
 - **Errores:** los mensajes para el usuario van en español; los de validación se
   traducen en `app/mensajes.py` y nunca devuelven lo que la persona escribió.
 - **Estado actual:** existen el contrato (`esquemas.py`), el cálculo de la nota,
-  el módulo auth (sesión, usuarios, auditoría) y el de rúbricas (cohortes,
-  laboratorios, carga con IA y versiones). `app/ia/cliente.py` es un cliente
+  el módulo auth (sesión, usuarios, auditoría), el de rúbricas (cohortes,
+  laboratorios, carga con IA y versiones) y el de entregas (subida, portafolio,
+  almacén de archivos). `app/ia/cliente.py` es un cliente
   mínimo (`pedir_json`) que el evaluador amplía. Los paquetes `sandbox` e
   `informes` están vacíos y se llenan en el orden de `docs/arranque-claude-code.md`.
 - **Rúbricas:** la versión vigente es la de número más alto; para evaluar se usa
   `app.rubricas.versiones.version_evaluable`, que falla si la vigente tiene errores.
   En las pruebas la IA se simula con el fixture `ia_simulada` (`tests/conftest.py`).
+- **Archivos subidos:** se leen con `app/archivos/` (PDF en proceso aparte, ZIP en
+  memoria, PPTX), nunca se ejecutan, y se guardan con `app/almacen.py` (`ALMACEN=local`
+  en el PC, `supabase` en Render). La ruta del archivo la arma el backend. En las
+  pruebas, el fixture `almacen` usa una carpeta temporal; los archivos de prueba se
+  arman en `tests/archivos_prueba.py`.
 
 ## Guardrails automáticos
 

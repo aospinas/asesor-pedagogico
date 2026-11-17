@@ -157,3 +157,94 @@ Salieron de los dos revisores en la Puerta 2 del módulo auth. Corrigen o precis
 - **El estudiante recibe solo** número, estructura y fecha de la rúbrica.
 - **Las versiones no se pueden editar ni borrar** tampoco desde el código: un evento de SQLAlchemy lo impide.
 - **A Ollama nunca se le manda la llave.** Una respuesta cortada o un JSON muy anidado de la IA se rechazan.
+
+## D-17 · Entregas, portafolio y almacén de archivos (16-nov-2026)
+
+- **Almacén con dos opciones (`ALMACEN`):** `local` (una carpeta, para el PC y las pruebas) y `supabase` (Supabase Storage, bucket privado, para Render; el disco de Render se borra en cada despliegue). En producción la carpeta local no se acepta: subir una entrega responde 503 en vez de perder archivos. La app sigue arriba aunque Supabase no esté configurado.
+- **La llave de Supabase solo va a `https://<ref>.supabase.co`**; cualquier otra dirección (o "pendiente") se rechaza antes de mandar nada.
+- **Descarga solo con enlace firmado de 5 minutos (RNF-07).** En Supabase lo firma Supabase. En local lo firma la app (JWT con audiencia `archivo`, así nunca sirve como sesión) y se abre en la ruta pública nueva `GET /api/archivos/{token}`. El archivo se baja como adjunto, nunca se abre dentro de la app.
+- **La ruta de cada archivo la arma el backend** (`entregas/<id>/<id>`); el nombre que manda el estudiante solo se muestra, limpio de rutas y caracteres raros.
+- **Qué se extrae al subir (RF-09):** texto del PDF por página, árbol y texto de los archivos del ZIP (en memoria, sin ejecutar nada) y texto de las diapositivas (PPTX o PDF). **Las imágenes se guardan sin describir** y el **código de un enlace de GitHub no se descarga**: los dos quedan para el evaluador (gastan tokens o bajan contenido de internet y conviene revisarlos con el sandbox).
+- **Video fuera de esta versión:** no se acepta como archivo (gastaría el 1 GB gratis de Supabase); el SRS ya dejaba su análisis por fuera.
+- **Topes:** 30 MB por petición solo en `POST /api/entregas` (las demás siguen en 6 MB); informe 10 MB y 60 páginas; ZIP 15 MB, 500 archivos y 20 MB abierto (512 KB por archivo de texto y 5 MB de texto en total); 5 imágenes de 2 MB; diapositivas 10 MB.
+- **ZIP:** se rechaza entero si trae rutas que se salen de la carpeta, enlaces simbólicos, contraseña o si miente sobre su tamaño. Se omiten binarios, archivos grandes y carpetas como `__pycache__`, `.git`, `node_modules` y `.venv`.
+- **Solo se entrega si el laboratorio tiene una rúbrica lista** (válida y confirmada); la entrega queda amarrada a esa versión aunque la rúbrica cambie después. Se puede entregar varias veces: nada se borra.
+- **El estudiante solo ve lo suyo:** si pide una entrega, un archivo o un portafolio ajeno recibe 404, igual que si no existiera.
+- **El lector de PDF quedó compartido** en `app/archivos/pdf.py` (rúbricas y entregas).
+- **Cambia el SRS (sección 8):** `evidencias` suma `tamano_bytes`, `tipo_mime`, `resumen` y `fecha`; `texto_extraido` es JSON.
+
+**Arreglos de la revisión (Puerta 2):**
+
+- **Memoria (Render tiene 512 MB):** el PDF se lee en un proceso aparte con 200 MB (antes 400) y **uno a la vez**; solo se procesan **dos subidas a la vez** (si no hay turno en 20 s, 503). El PPTX ya no se abre con python-pptx (un archivo de 164 KB pedía 265 MB): se lee con expresiones regulares, con 2 MB por diapositiva y 10 MB en total. Los ZIP y PPTX solo se aceptan con compresión normal (sin LZMA, bzip2 ni zstd).
+- **El tope de texto se cumple de verdad:** se corta dentro del proceso aparte, antes de llegar a la app, y queda `recortado` en `texto_extraido` y en el resumen. Antes un PDF de 269 KB devolvía 4,5 millones de caracteres.
+- **Topes por estudiante:** 5 entregas por hora, 10 por laboratorio y no se acepta el mismo informe (mismo SHA-256) dos veces en un laboratorio. Además, 20 subidas por minuto por IP.
+- **Más de 6 MB solo con sesión:** el middleware revisa la cookie firmada (sin ir a la base) antes de recibir una subida grande; sin ella responde 401 sin leer el cuerpo.
+- **Las listas no cargan el texto extraído:** `texto_extraido` es una columna diferida y el resumen se guarda al subir en la columna `resumen`. `mis-entregas` y la bandeja del docente se paginan (`desde`, `limite`; 50 por defecto, máximo 200).
+- **Un solo almacén para toda la app** (una sola conexión a Supabase).
+- **Auditoría:** también quedan `acceso_ajeno_denegado` (el 404 por dueño), `enlace_emitido` (quién pidió bajar qué) y `archivo_rechazado` (con el motivo). Si no se puede borrar un archivo suelto, su ruta queda en el registro del servidor para borrarlo a mano.
+- **Nombres y rutas sin caracteres invisibles** (controles, ancho cero, los que invierten el texto) ni `< > | " * ? :`.
+- **La llave `service_role` de Supabase da acceso total al proyecto** (base y archivos), no solo a Storage: va solo en las variables de Render. La dirección se revisa completa (`fullmatch`).
+- **Matrícula:** cualquier estudiante puede entregar en cualquier laboratorio. El SRS no pide matrícula por cohorte; si se pide después, se valida la cohorte al subir.
+- **Imágenes:** no se revisan sus dimensiones porque hoy no se abren. El evaluador debe leer ancho y alto de la cabecera y poner un tope antes de mandarlas a la IA.
+- **Enlace local:** el token va en la dirección y sirve 5 minutos a quien lo tenga. Solo existe en el PC (almacén local); se acepta así.
+
+**Arreglos de la segunda revisión:**
+
+- **Topes sin carrera:** con subidas simultáneas entraban 8 entregas con tope de 5. Ahora, justo antes de guardar, se bloquea la fila del estudiante (`SELECT ... FOR UPDATE`) y se vuelven a contar los topes en la misma transacción del INSERT. El informe repetido además lo frena la base: `entregas.sha256_informe` con restricción única (estudiante, laboratorio, informe). Probado con 8 subidas a la vez en PostgreSQL.
+- **El turno cubre toda la subida:** leer, procesar y guardar en Supabase (antes el informe se leía antes del turno y el guardado iba después).
+- **Más topes:** 10 archivos rechazados por hora (gastan turno y lector de PDF igual que una entrega) y 100 MB por estudiante por día (el 1 GB de Supabase ya no se llena en horas).
+- **El límite por minuto usa el id del usuario como clave**, no la IP: detrás del proxy de Render todos llegan con la misma IP. El arreglo de fondo (`--proxy-headers`) sigue pendiente para el despliegue.
+- **Índice del ZIP revisado antes de abrirlo:** se lee solo el registro final (22 bytes) y se rechaza si declara demasiadas entradas o un índice enorme; antes, un ZIP de 14 MB con 300.000 entradas falsas pedía 149 MB. Aplica al ZIP de código, al PPTX y al Word de las rúbricas.
+- **Lector de PDF ocupado:** responde 503 con aviso en rúbricas y entregas (antes, 500 en rúbricas). Rúbricas suelta la conexión a la base mientras espera.
+- **Nombres:** un nombre como `". ."` quedaba vacío y tumbaba las listas con 500; ahora se usa el nombre por defecto. También se quitan los saltos de línea de Unicode (U+2028, U+2029) y los caracteres privados o sin asignar, en nombres y rutas del ZIP.
+- **Auditoría:** el mismo intento ajeno no se repite dentro de un minuto.
+- **`/api/estudiantes` se pagina** como las otras listas, y las listas tienen orden fijo (el id desempata; los archivos de una entrega salen en orden: informe, código, diapositivas, imágenes).
+- **`python-pptx` sale de producción** (junto con `lxml` y `xlsxwriter`): solo lo usan las pruebas, en `requirements-dev.in`.
+- **Se acepta:** el filtro de 6 MB del middleware deja pasar cualquier cookie firmada y sin vencer (aunque la sesión se haya cerrado o el usuario sea docente); la revisión completa viene después y responde 401 o 403. Solo cuesta recibir hasta 30 MB.
+- **Riesgo bajo que queda:** en SQLite (pruebas) no hay bloqueo de fila; en producción se usa PostgreSQL.
+
+**Arreglos de la tercera revisión:**
+
+- **ZIP64:** si justo antes del registro final hay un localizador ZIP64, zipfile usa ese registro e ignora el normal; un ZIP que decía "1 entrada" en el registro normal y 300.000 en el ZIP64 llegaba a 144 MB. Ahora un ZIP64 se rechaza (no hace falta para estos tamaños) y, como segunda defensa, el índice tiene que caber completo antes del registro final. Aplica al ZIP de código, al PPTX y al Word de las rúbricas.
+- **Auditoría con tope por usuario:** como máximo 20 filas `acceso_ajeno_denegado` por hora (con ids al azar se podía escribir una fila por petición). Además, ver una entrega, pedir un enlace y ver un portafolio tienen límite de 60 por minuto por usuario.
+- **Bloqueo más liviano:** `FOR NO KEY UPDATE` en vez de `FOR UPDATE`, para no frenar las llaves foráneas de la fila del estudiante.
+- **Solo la restricción del informe responde "ya subiste este informe"**; cualquier otro error de integridad sale como error.
+- **Nombres sin `< > | " * ? :`** también en el nombre visible (antes solo en las rutas del ZIP).
+- **Orden fijo también en el portafolio** (los ids desempatan).
+- **Se acepta:** una subida puede tardar hasta unos 110 s en el peor caso (espera de turno, espera del lector de PDF y lectura). No tumba la app; ocupa un turno mientras tanto.
+
+**Arreglos de la cuarta revisión:**
+
+- **Los límites por minuto cuentan por ruta**, no por dirección exacta (`key_style="endpoint"` en el limitador). Antes cada id tenía su propio contador y el "60 por minuto" de la tercera revisión no frenaba a quien probaba ids al azar. Probado con 61 peticiones de ids distintos en las tres rutas.
+- **ZIP, PPTX o Word con un nombre interno mal codificado** (marcado UTF-8 con bytes inválidos) daban 500; ahora dan el aviso de siempre y cuentan como archivo rechazado.
+- **Las pruebas de ZIP64 usan un ZIP64 válido** (zipfile lo abre); comprobado que fallan si se quita la defensa.
+- **Auditoría:** al llegar al tope de intentos ajenos queda una sola fila `acceso_ajeno_tope` por hora, y cada intento siguiente va al registro del servidor con lo que pidió. El mismo enlace pedido otra vez dentro de un minuto no se vuelve a anotar.
+- **Nombres:** se normalizan con NFKC antes de filtrar, para que `＜ ＞` de ancho completo no se cuelen.
+- **"Ya subiste este informe"** solo con la restricción única de verdad (en SQLite, "UNIQUE constraint failed" y la columna); cualquier otro error de integridad va al registro y sale como error genérico.
+- **Se acepta:** el tope de intentos ajenos se cuenta sin bloqueo; en una ráfaga simultánea pueden entrar unas filas de más antes de que corte.
+
+**Arreglos de la quinta revisión:**
+
+- **ZIP con desplazamiento enorme en el índice** (campo extra ZIP64 de 2^63 en un ZIP normal): daba `OverflowError` y 500 en ZIP, PPTX y Word. Ahora cada entrada tiene que empezar dentro del archivo (se revisa después de que zipfile lee el índice y antes de abrir ninguna entrada) y `ArithmeticError` también se captura. Da el aviso de siempre y cuenta como archivo rechazado.
+- **Rutas del ZIP con caracteres de compatibilidad:** ver la sexta revisión (ahora se normalizan en vez de rechazarse).
+- **`enlace_emitido` con tope de 200 por usuario por hora** (ver la sexta revisión: además queda una fila `enlace_tope`).
+- **Pruebas más fuertes:** el orden fijo del portafolio se prueba con ids fijos (sin el desempate falla siempre) y la restricción única real se reconoce como "ya subiste este informe".
+- **Se acepta:** por encima del tope de intentos ajenos, cada intento deja una línea en el registro del servidor (como mucho 180 por minuto por usuario, por el límite de las rutas).
+
+**Arreglos de la sexta revisión:**
+
+- **Word con compresión rara:** el lector del .docx de rúbricas era el único que no revisaba la compresión; un `document.xml` con zstd (Python 3.14+) lanzaba `ZstdError` y daba 500. Ahora acepta solo compresión normal y sin contraseña, como el ZIP y el PPTX. Además, como red de seguridad, **cualquier excepción al leer un ZIP ajeno** se trata como archivo dañado (aviso y no 500): así se corta esta familia de errores en vez de ir uno por uno. Desde la séptima revisión, las excepciones que no son de un tipo conocido además quedan en el registro del servidor con su tipo (sin contenido del archivo), para no confundir un error de nuestro código con un archivo dañado.
+- **Rutas del ZIP: se normalizan con NFKC en vez de rechazarse.** La ruta normalizada es la que se revisa y la que se guarda: `＜entrega＞` queda `<entrega>` y se rechaza, `．．` queda `..` y se rechaza, y `Taller 1º.py`, `x².py` o los espacios especiales de macOS pasan (como `Taller 1o.py`, `x2.py`). Antes se rechazaba el ZIP entero.
+- **Aviso de rutas más claro** (dice qué buscar), sin repetir el nombre que mandó el estudiante.
+- **Tope de enlaces con rastro:** al pasar los 200 por hora queda una fila `enlace_tope` y cada enlace siguiente va al registro como aviso (el nivel `info` no se imprimía con la configuración por defecto).
+- **La rama "ya subiste este informe" por restricción única se prueba por la ruta** (409 y se borran los archivos nuevos).
+- **Pendiente para el evaluador:** caracteres parecidos a `< >` que NFKC no cambia (`〈 〉`, `‹ ›`) pasan en nombres y rutas. No forman la etiqueta `<entrega>`, pero el evaluador debe meter nombres y rutas como datos escapados (por ejemplo JSON) dentro de `<entrega>`, sin confiar solo en el filtro de caracteres.
+
+**Arreglos de la séptima revisión** (la de seguridad se hizo con Opus 5.5: Mythos 5.2 y Fable 5.2 no tenían créditos):
+
+- **La red de seguridad deja rastro:** una excepción de tipo desconocido al leer un ZIP, PPTX o Word sigue dando el aviso de archivo dañado, pero deja una línea en el registro con el tipo del error. Las excepciones conocidas no llenan el registro.
+- **Nombres repetidos:** un ZIP con dos archivos que quedan con la misma ruta (después de NFKC y sin mirar mayúsculas, por ejemplo `main.py` y `ｍａｉｎ.py`, o la misma entrada dos veces) se rechaza. Si no, el evaluador vería dos `main.py` distintos y una cita no diría a cuál se refiere.
+- **El aviso de rutas** también nombra los caracteres invisibles y los nombres de más de 255 letras.
+- **Pasada final:** las rutas con tramos `.` o vacíos (`./main.py`, `a//main.py`) y con espacios al inicio o al final (`main.py `) se rechazan; apuntaban al mismo archivo o se veían iguales y se colaban como repetidos.
+- **Se acepta:** como no se distinguen mayúsculas, un proyecto con `Makefile` y `makefile` en la misma carpeta se rechaza (es raro).
+- **Se acepta:** letras de otro alfabeto que se ven iguales (`mаin.py` con "а" cirílica) pasan como archivos distintos; NFKC no las cambia. El evaluador cita la ruta exacta, así que no se confunden al buscar la cita.

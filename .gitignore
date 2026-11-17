@@ -25,3 +25,6 @@ uploads/
 
 # Archivos temporales de Word
 ~$*
+
+# Archivos de las entregas en el PC (ALMACEN=local)
+almacen_local/

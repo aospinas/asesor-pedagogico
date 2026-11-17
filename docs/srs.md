@@ -8,7 +8,7 @@ El Asesor Pedagógico Inteligente es una plataforma web que evalúa los laborato
 
 **Propósito del documento.** Fijar qué debe hacer el sistema, cómo se construye en un día con Claude Code y cómo se demuestra que cumple cada punto del enunciado del proyecto final.
 
-**Alcance.** Producto mínimo funcional que cubre las 7 funcionalidades obligatorias y las 6 condiciones de ingeniería. Los videos y presentaciones se aceptan como evidencia opcional; el análisis de video queda fuera de esta versión y se documenta como limitación.
+**Alcance.** Producto mínimo funcional que cubre las 7 funcionalidades obligatorias y las 6 condiciones de ingeniería. Las imágenes y presentaciones se aceptan como evidencia opcional. El video queda fuera de esta versión (no se sube ni se analiza) y se documenta como limitación (D-17).
 
 **Restricciones.**
 
@@ -43,7 +43,7 @@ Son 22 requisitos; los 18 marcados "Debe" cubren las 7 funcionalidades obligator
 | RF-04 | Cargar la rúbrica (PDF, DOCX, texto o JSON) y convertirla con IA en estructura: competencias, criterios, descriptores, niveles y pesos | Debe | F3 |
 | RF-05 | Validar la rúbrica: pesos que suman 100 %, niveles ordenados, criterios sin descriptor o sin nivel. Si hay errores, se muestran y la evaluación queda bloqueada hasta corregirlos en un editor | Debe | F3 |
 | RF-06 | Cada cambio a una rúbrica crea una versión nueva; las versiones viejas no se borran | Debe | F2, C6 |
-| RF-07 | El estudiante sube su entrega: informe PDF (se verifica que tenga texto legible), código en ZIP o enlace público de GitHub; imágenes, diapositivas y video son opcionales | Debe | F1, F2 |
+| RF-07 | El estudiante sube su entrega: informe PDF (se verifica que tenga texto legible), código en ZIP o enlace público de GitHub; imágenes y diapositivas son opcionales; el video queda fuera de esta versión (D-17) | Debe | F1, F2 |
 | RF-08 | Portafolio organizado por estudiante, cohorte y laboratorio, con la versión de rúbrica asociada a cada entrega | Debe | F2 |
 | RF-09 | Extraer evidencias: texto del PDF por página, árbol y contenido de los archivos de código, imágenes y diagramas descritos por un modelo de visión | Debe | F4 |
 | RF-10 | Verificar el código en el sandbox: sintaxis, análisis estático y pruebas unitarias si la entrega trae pruebas | Debe | C3 |
@@ -234,8 +234,8 @@ Trece tablas en PostgreSQL. Las rúbricas y las evaluaciones nunca se sobrescrib
 | `laboratorios` | id, cohorte\_id, titulo, descripcion, objetivos, temas\_ia | Los 3 elementos base del enunciado (F1) |
 | `rubricas` | id, laboratorio\_id | Una rúbrica por laboratorio; la versión vigente es la de número más alto (D-16) |
 | `rubrica_versiones` | id, rubrica\_id, numero, estructura, valida, errores, origen, archivo\_sha256, prompt\_version, modelo, tokens\_entrada, tokens\_salida, creada\_por, fecha | Versiones inmutables con competencias, criterios, niveles y pesos. Las que convierte la IA quedan por confirmar hasta que el docente las guarda (D-16) |
-| `entregas` | id, estudiante\_id, laboratorio\_id, rubrica\_version\_id, fecha | La entrega queda amarrada a la versión de rúbrica (F2) |
-| `evidencias` | id, entrega\_id, tipo (pdf, codigo, imagen, diapositivas, video), nombre, sha256, ruta\_storage, texto\_extraido | Archivos y su huella digital |
+| `entregas` | id, estudiante\_id, laboratorio\_id, rubrica\_version\_id, enlace\_github, sha256\_informe (único por estudiante y laboratorio), fecha | La entrega queda amarrada a la versión de rúbrica (F2) |
+| `evidencias` | id, entrega\_id, tipo (pdf, codigo, imagen, diapositivas), nombre, sha256, tamano\_bytes, tipo\_mime, ruta\_storage, texto\_extraido (JSON), resumen, fecha | Archivos y su huella digital (D-17) |
 | `evaluaciones` | id, entrega\_id, rubrica\_version\_id, proveedor, modelo, version\_prompt, estado, nota\_preliminar, nota\_final, tokens\_entrada, tokens\_salida, costo\_usd, alerta\_inyeccion, fecha | La traza principal (C6) |
 | `evaluacion_criterios` | id, evaluacion\_id, criterio\_id, nivel\_ia, nivel\_final, justificacion, evidencias\_json, citas\_verificadas, fortalezas, debilidades, recomendaciones | Resultado por criterio |
 | `verificaciones_codigo` | id, evaluacion\_id, tipo (sintaxis, estatico, pruebas), comando, codigo\_salida, salida, duracion\_ms, tiempo\_agotado | Resultados del sandbox (C3) |
@@ -312,8 +312,8 @@ Los prompts viven en archivos (`prompts/evaluar_criterio_v1.md`, `prompts/interp
 | PDF de texto | PyMuPDF, texto por página | Incluido |
 | Código (ZIP o GitHub) | Lectura de archivos con número de línea + sandbox | Incluido |
 | Imágenes y diagramas | Modelo con visión que describe la imagen; la descripción se vuelve evidencia | Incluido |
-| Diapositivas (PPTX) | Texto con python-pptx | Incluido si sobra tiempo |
-| Video | Transcripción de audio | Fuera de esta versión, documentado como limitación |
+| Diapositivas (PPTX o PDF) | Texto por diapositiva, leído con topes (D-17) | Incluido |
+| Video | Transcripción de audio | Fuera de esta versión: no se acepta como archivo (D-17) |
 
 ## 10. Sandbox y verificación del código
 
@@ -547,8 +547,8 @@ Cada punto del enunciado tiene su requisito, el módulo donde vive y la prueba q
 
 | Enunciado | Requisitos | Módulo | Prueba | Estado |
 | --- | --- | --- | --- | --- |
-| F1 Entrada de información | RF-03, RF-07 | `app/api/laboratorios.py`, `app/api/entregas.py` | `tests/test_laboratorios.py` (RF-03, hecho); `tests/test_entregas.py`: PDF sin texto rechazado | En curso: RF-03 hecho |
-| F2 Portafolio académico | RF-06, RF-08 | `app/api/portafolio.py` | `tests/test_portafolio.py`: entrega guarda versión de rúbrica | Pendiente |
+| F1 Entrada de información | RF-03, RF-07 | `app/api/laboratorios.py`, `app/api/entregas.py` | `tests/test_laboratorios.py`; `tests/test_entregas.py`: PDF sin texto rechazado | Hecho |
+| F2 Portafolio académico | RF-06, RF-08 | `app/api/portafolio.py` | `tests/test_portafolio.py`: entrega guarda versión de rúbrica | Hecho |
 | F3 Gestión de rúbricas | RF-04, RF-05 | `app/rubricas/` | `tests/test_rubricas.py`: pesos que suman 90 % bloquean | Hecho |
 | F4 Evaluación inteligente | RF-09 a RF-14 | `app/evaluador/` | `tests/test_evaluador.py` con respuesta de IA simulada | Pendiente |
 | F5 Informe integrado | RF-16 | `app/informes/` | `tests/test_informe.py`: PDF generado con 2 cohortes | Pendiente |

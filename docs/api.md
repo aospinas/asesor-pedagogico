@@ -10,6 +10,9 @@ si la ruta, el rol o los requisitos no coinciden.
   backend lo revisa en cada consulta.
 - **Ya publicado:** al estudiante solo se le muestra lo que sale de evaluaciones
   que el docente ya publicó.
+- **Listas paginadas:** `GET /api/mis-entregas`, `GET /api/laboratorios/{laboratorio_id}/entregas`
+  y `GET /api/estudiantes` reciben `desde` (cuántas saltar) y `limite` (cuántas traer; 50 por
+  defecto, máximo 200).
 - Nadie puede borrar evaluaciones ni rúbricas, y ninguna ruta recibe una nota:
   la nota siempre la calcula `app/evaluador/nota.py`.
 
@@ -42,6 +45,7 @@ si la ruta, el rol o los requisitos no coinciden.
 | `GET /api/entregas/{entrega_id}` | Ver una entrega | Estudiante (solo lo suyo), Docente | RF-08 |
 | `GET /api/laboratorios/{laboratorio_id}/entregas` | Ver las entregas de un laboratorio | Docente | RF-08 |
 | `GET /api/evidencias/{evidencia_id}/enlace` | Pedir un enlace firmado que vence pronto para descargar un archivo | Estudiante (solo lo suyo), Docente | RNF-07 |
+| `GET /api/archivos/{token}` | Bajar un archivo con un enlace firmado que vence pronto (solo con almacén local) | Pública (sin sesión) | RNF-07 |
 | `GET /api/portafolio/{estudiante_id}` | Ver el portafolio de un estudiante | Estudiante (solo lo suyo), Docente | RF-08 |
 | `GET /api/evaluaciones` | Bandeja de evaluaciones por revisar | Docente | RF-14 |
 | `POST /api/entregas/{entrega_id}/evaluaciones` | Lanzar la evaluación con IA | Docente | RF-09, RF-10, RF-11, RF-13 |

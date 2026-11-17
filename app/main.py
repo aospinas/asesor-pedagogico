@@ -14,8 +14,10 @@ from slowapi.errors import RateLimitExceeded
 from sqlalchemy.exc import OperationalError
 from starlette.exceptions import HTTPException as ErrorHTTP
 
-from app.api import auditoria, laboratorios, rubricas, sesion, usuarios
-from app.api.seguridad import limitador
+from app.almacen import AlmacenNoDisponible
+from app.api import auditoria, entregas, laboratorios, portafolio, rubricas, sesion, usuarios
+from app.api.seguridad import limitador, tiene_sesion_firmada
+from app.archivos.pdf import ServidorOcupado
 from app.config import ajustes
 from app.db import BaseNoDisponible
 from app.mensajes import explicar
@@ -32,8 +34,9 @@ app.state.limiter = limitador
 
 METODOS_QUE_CAMBIAN_DATOS = {"POST", "PUT", "PATCH", "DELETE"}
 # El archivo más grande que se acepta (la rúbrica, 5 MB) más el sobre del formulario.
-# Si un módulo necesita subir algo más grande (entregas), se sube aquí con su decisión.
 MAXIMO_CUERPO_BYTES = 6 * 1024 * 1024
+# Las rutas que reciben más, cada una con su decisión (D-17).
+MAXIMO_CUERPO_POR_RUTA = {("POST", "/api/entregas"): 30 * 1024 * 1024}
 
 
 def _viene_de_otro_sitio(request: Request) -> bool:
@@ -61,15 +64,19 @@ def _cuerpo_no_permitido(request: Request) -> JSONResponse | None:
         return None
     if "transfer-encoding" in request.headers:  # sin tamaño declarado no se sabe cuánto llega
         return JSONResponse({"detail": "Falta el tamaño de la petición."}, status.HTTP_411_LENGTH_REQUIRED)
+    maximo = MAXIMO_CUERPO_POR_RUTA.get((request.method, request.url.path), MAXIMO_CUERPO_BYTES)
     try:
         tamano = int(request.headers.get("content-length", "0"))
     except ValueError:
-        tamano = MAXIMO_CUERPO_BYTES + 1
-    if tamano > MAXIMO_CUERPO_BYTES:
+        tamano = maximo + 1
+    if tamano > maximo:
         return JSONResponse(
-            {"detail": f"La petición pesa más de {MAXIMO_CUERPO_BYTES // (1024 * 1024)} MB."},
+            {"detail": f"La petición pesa más de {maximo // (1024 * 1024)} MB."},
             status.HTTP_413_CONTENT_TOO_LARGE,
         )
+    if tamano > MAXIMO_CUERPO_BYTES and not tiene_sesion_firmada(request):
+        # Más de 6 MB solo para quien ya inició sesión: sin cuenta no se gasta disco ni red.
+        return JSONResponse({"detail": "Inicia sesión para continuar."}, status.HTTP_401_UNAUTHORIZED)
     return None
 
 
@@ -137,6 +144,25 @@ async def demasiadas_peticiones(request: Request, error: RateLimitExceeded) -> J
     )
 
 
+@app.exception_handler(ServidorOcupado)
+async def servidor_ocupado(request: Request, error: ServidorOcupado) -> JSONResponse:
+    # Otro PDF se está leyendo y no hubo turno a tiempo (rúbricas o entregas): aviso, no 500.
+    return JSONResponse(
+        {"detail": "Hay muchos archivos leyéndose en este momento. Intenta de nuevo en un minuto."},
+        status.HTTP_503_SERVICE_UNAVAILABLE,
+    )
+
+
+@app.exception_handler(AlmacenNoDisponible)
+async def almacen_no_disponible(request: Request, error: AlmacenNoDisponible) -> JSONResponse:
+    # Supabase Storage sin configurar o sin responder: la app sigue arriba. El detalle va al registro.
+    registro.error("Almacén no disponible en %s %s: %s", request.method, request.url.path, error)
+    return JSONResponse(
+        {"detail": "El almacenamiento de archivos no está disponible. Intenta de nuevo en un rato."},
+        status.HTTP_503_SERVICE_UNAVAILABLE,
+    )
+
+
 @app.exception_handler(BaseNoDisponible)
 @app.exception_handler(OperationalError)
 async def base_no_disponible(request: Request, error: Exception) -> JSONResponse:
@@ -160,3 +186,5 @@ app.include_router(usuarios.router)
 app.include_router(auditoria.router)
 app.include_router(laboratorios.router)
 app.include_router(rubricas.router)
+app.include_router(entregas.router)
+app.include_router(portafolio.router)

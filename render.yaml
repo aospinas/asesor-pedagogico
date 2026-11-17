@@ -25,6 +25,8 @@ services:
         value: "60"
       - key: DATABASE_URL
         sync: false
+      - key: ALMACEN
+        value: supabase
       - key: SUPABASE_URL
         sync: false
       - key: SUPABASE_SERVICE_KEY

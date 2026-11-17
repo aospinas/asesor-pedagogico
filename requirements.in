@@ -12,7 +12,6 @@ bcrypt
 pyjwt
 openai
 pymupdf
-python-pptx
 rapidfuzz
 weasyprint
 jinja2

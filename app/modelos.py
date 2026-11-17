@@ -1,6 +1,7 @@
 """Tablas de la base de datos (SRS sección 8).
 
-Por ahora: usuarios, intentos de sesión, auditoría, cohortes, laboratorios y rúbricas.
+Por ahora: usuarios, intentos de sesión, auditoría, cohortes, laboratorios, rúbricas,
+entregas y evidencias.
 """
 
 import uuid
@@ -119,4 +120,53 @@ class RubricaVersion(Base):
     tokens_entrada: Mapped[int | None] = mapped_column(Integer, default=None)
     tokens_salida: Mapped[int | None] = mapped_column(Integer, default=None)
     creada_por: Mapped[uuid.UUID] = mapped_column(ForeignKey("usuarios.id"))
+    fecha: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_ahora)
+
+
+class Entrega(Base):
+    """Una entrega de un estudiante, amarrada a la versión de rúbrica con la que se evaluará (F2).
+
+    Se puede entregar varias veces: cada entrega es una fila nueva y nada se borra.
+    """
+
+    __tablename__ = "entregas"
+    # El mismo informe no entra dos veces en un laboratorio, ni con dos subidas al mismo tiempo.
+    __table_args__ = (
+        UniqueConstraint("estudiante_id", "laboratorio_id", "sha256_informe", name="uq_entregas_informe"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    estudiante_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("usuarios.id"), index=True)
+    laboratorio_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("laboratorios.id"), index=True)
+    rubrica_version_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("rubrica_versiones.id"))
+    enlace_github: Mapped[str | None] = mapped_column(String(200), default=None)
+    sha256_informe: Mapped[str] = mapped_column(String(64))
+    fecha: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_ahora, index=True)
+
+
+class Evidencia(Base):
+    """Un archivo de la entrega con su huella SHA-256 y el texto que se le sacó (RF-09).
+
+    `texto_extraido`:
+    - PDF: {"paginas": [...], "recortado": bool}
+    - diapositivas: {"paginas": [...], "formato": "pptx" | "pdf", "recortado": bool}
+    - código: {"arbol": [...], "archivos": [{"ruta", "texto"}], "omitidos": [{"ruta", "motivo"}]}
+    - imágenes: None (las describe el evaluador)
+    `recortado` es True si el texto pasaba del tope y se cortó.
+    """
+
+    __tablename__ = "evidencias"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    entrega_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("entregas.id"), index=True)
+    tipo: Mapped[str] = mapped_column(String(20))
+    nombre: Mapped[str] = mapped_column(String(255))
+    sha256: Mapped[str] = mapped_column(String(64))
+    tamano_bytes: Mapped[int] = mapped_column(Integer)
+    tipo_mime: Mapped[str] = mapped_column(String(100))
+    ruta_storage: Mapped[str] = mapped_column(String(300))
+    # Se carga solo cuando hace falta (evaluar): puede pesar varios MB por archivo.
+    texto_extraido: Mapped[dict[str, Any] | None] = mapped_column(JSON, default=None, deferred=True)
+    # Lo que muestran las listas, calculado al subir: así no se lee el texto completo.
+    resumen: Mapped[str | None] = mapped_column(String(300), default=None)
     fecha: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_ahora)
