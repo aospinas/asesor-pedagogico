@@ -27,7 +27,7 @@ class Ajustes(BaseSettings):
     entorno: Literal["desarrollo", "pruebas", "produccion"] = "desarrollo"
     database_url: str = ""
     jwt_secreto: str = ""
-    origenes_permitidos: str = "http://localhost:5173"
+    origenes_permitidos: str = "http://localhost:5173,http://127.0.0.1:8000"
     sesion_minutos: int = Field(default=480, ge=5, le=1440)
     bcrypt_rondas: int = Field(default=12, ge=4, le=15)
 

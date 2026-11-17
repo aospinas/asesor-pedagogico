@@ -9,6 +9,7 @@ from uuid import uuid4
 
 import pytest
 from fastapi.routing import APIRoute
+from starlette.routing import Mount
 
 from app.api.rutas import RUTAS
 from app.esquemas import Rol
@@ -20,6 +21,8 @@ TABLA = {(r.metodo, r.ruta): r for r in RUTAS}
 def _rutas(contenedor):
     """Todas las rutas de la app. FastAPI guarda las de cada módulo dentro de un contenedor."""
     for ruta in contenedor.routes:
+        if isinstance(ruta, Mount):
+            continue
         if isinstance(ruta, APIRoute):
             yield ruta
         elif hasattr(ruta, "original_router"):

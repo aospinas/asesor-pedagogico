@@ -550,16 +550,16 @@ Cada punto del enunciado tiene su requisito, el módulo donde vive y la prueba q
 | F1 Entrada de información | RF-03, RF-07 | `app/api/laboratorios.py`, `app/api/entregas.py` | `tests/test_laboratorios.py`; `tests/test_entregas.py`: PDF sin texto rechazado | Hecho |
 | F2 Portafolio académico | RF-06, RF-08 | `app/api/portafolio.py` | `tests/test_portafolio.py`: entrega guarda versión de rúbrica | Hecho |
 | F3 Gestión de rúbricas | RF-04, RF-05 | `app/rubricas/` | `tests/test_rubricas.py`: pesos que suman 90 % bloquean | Hecho |
-| F4 Evaluación inteligente | RF-09 a RF-14 | `app/evaluador/` | `tests/test_evaluador.py` con respuesta de IA simulada; `tests/test_evaluador_sandbox.py` con el sandbox conectado | En curso: RF-09 a RF-13 hechos (D-19, D-20); RF-14 con la revisión docente |
-| F5 Informe integrado | RF-16 | `app/informes/` | `tests/test_informe.py`: PDF generado con 2 cohortes | Pendiente |
-| F6 Mapa mental | RF-17 | `frontend/src/mapa/`, `app/api/mapa.py` | `tests/test_mapa.py`: JSON con temas, labs y nivel | Pendiente |
-| F7 Proyecto y equipo | RF-18 | `frontend/src/paginas/Proyecto.tsx` | Revisión manual | Pendiente |
-| C1 Uso intensivo de IA | RF-22, RNF-13 | `docs/bitacora-ia.md` | Bitácora con una entrada por módulo | Pendiente |
-| C2 Evaluación estructurada | RNF-01, RNF-02 | `app/esquemas.py`, `app/evaluador/nota.py` | `tests/test_nota.py`: 5 casos de la fórmula | Pendiente |
+| F4 Evaluación inteligente | RF-09 a RF-14 | `app/evaluador/`, `app/api/revision.py` | `tests/test_evaluador.py`; `tests/test_revision.py`: al cambiar el nivel la nota pasa a 3,7 y el estudiante no ve nada hasta publicar | Hecho |
+| F5 Informe integrado | RF-16 | `app/informes/` | `tests/test_informe.py`: PDF generado con 2 cohortes | Hecho |
+| F6 Mapa mental | RF-17 | `frontend/src/mapa/`, `app/api/mapa.py` | `tests/test_mapa.py`: JSON con temas, labs y nivel | Hecho |
+| F7 Proyecto y equipo | RF-18 | `frontend/src/paginas/Proyecto.tsx` | `tests/test_proyecto.py`: los tres integrantes | Hecho (fotos reales pendientes) |
+| C1 Uso intensivo de IA | RF-22, RNF-13 | `docs/bitacora-ia.md`, `app/api/proyecto.py` | `tests/test_proyecto.py`: la bitácora pública trae el registro | Hecho (falta la reflexión final) |
+| C2 Evaluación estructurada | RNF-01, RNF-02 | `app/esquemas.py`, `app/evaluador/nota.py` | `tests/test_nota.py`: 5 casos de la fórmula | Hecho |
 | C3 Verificación del código | RF-10, RNF-03 | `app/sandbox/` | `tests/test_sandbox.py`: red, ciclo infinito, memoria, entorno | Hecho |
 | C4 Modelos configurables | RF-19, RF-20, RNF-04, RNF-14 | `app/ia/cliente.py`, `app/api/config_ia.py` | `tests/test_cliente_ia.py` con los 3 proveedores simulados; `tests/test_config_ia.py`: configuración, precios por modelo y panel de costos | Hecho (D-19) |
 | C5 Despliegue y calidad | RF-01, RF-02, RNF-05 a RNF-07, RNF-10 a RNF-12 | `Dockerfile`, `.github/workflows/ci.yml` | `tests/test_acceso.py` + CI en verde + URL pública | Pendiente |
-| C6 Trazabilidad y supervisión | RF-12, RF-14, RF-15, RNF-08, RNF-09 | `app/auditoria/`, pantalla de revisión | `tests/test_traza.py`: cambio de nivel queda auditado | Pendiente |
+| C6 Trazabilidad y supervisión | RF-12, RF-14, RF-15, RNF-08, RNF-09 | `app/auditoria/`, `app/api/revision.py` | `tests/test_traza.py`: cambio de nivel queda auditado | Hecho |
 
 ## 14. Riesgos, limitaciones y costos
 

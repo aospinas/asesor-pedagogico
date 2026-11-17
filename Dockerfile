@@ -1,6 +1,13 @@
 # Esta imagen se prueba en el PC con /probar-imagen, la vuelve a probar el CI
 # y la construye Render al publicar.
 # Plan B: si algo falla en 3.15, cambia esta línea a 3.12 (también está probada).
+FROM node:22-bookworm-slim AS web
+WORKDIR /web
+COPY frontend/package.json frontend/package-lock.json ./
+RUN npm ci
+COPY frontend/ ./
+RUN npm run build
+
 ARG PYTHON_VERSION=3.15
 FROM python:${PYTHON_VERSION}-slim
 
@@ -18,6 +25,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY app ./app
 COPY prompts ./prompts
+COPY --from=web /web/dist ./frontend/dist
 COPY alembic.ini .
 COPY migraciones ./migraciones
 

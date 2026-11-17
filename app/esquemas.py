@@ -624,6 +624,7 @@ class TrazaEvaluacion(Estricto):
 
 class ResultadoLaboratorio(Estricto):
     laboratorio_id: UUID
+    evaluacion_id: UUID
     titulo: str
     cohorte: str
     nota_final: float = Field(ge=NOTA_MINIMA, le=NOTA_MAXIMA, allow_inf_nan=False)
@@ -795,3 +796,26 @@ class RegistroAuditoria(Estricto):
     detalle: dict[str, Any] = Field(default_factory=dict)
     ip: IPvAnyAddress | None = None
     fecha: datetime
+
+
+# ---------- Página pública (RF-18, RF-22) ----------
+
+
+class Integrante(Estricto):
+    nombre: str = Field(min_length=1, max_length=120)
+    rol: str = Field(min_length=1, max_length=120)
+    foto_url: str | None = Field(default=None, max_length=300)
+
+
+class ProyectoPublico(Estricto):
+    titulo: str = Field(min_length=1, max_length=160)
+    abstract: str = Field(min_length=1, max_length=2000)
+    tecnologias: list[str] = Field(min_length=1, max_length=12)
+    aportes: list[str] = Field(min_length=1, max_length=12)
+    equipo: list[Integrante] = Field(min_length=1, max_length=12)
+
+
+class BitacoraPublica(Estricto):
+    """El texto de docs/bitacora-ia.md, para mostrarlo en la app."""
+
+    contenido: str = Field(max_length=100_000)

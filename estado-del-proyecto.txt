@@ -1,0 +1,115 @@
+Asesor Pedagógico Inteligente
+Estado del proyecto — 17 de noviembre de 2026
+
+Este archivo resume tres cosas: lo que ya estaba en el repositorio,
+lo que se agregó en esta sesión y lo que todavía falta.
+
+
+1. Lo que ya estaba hecho
+
+El código que se sacó de GitHub ya cubría el backend hasta el 17 de
+noviembre. La regla del proyecto se cumple en esa parte: la IA propone,
+el backend calcula la nota y el docente es quien debe aprobar.
+
+Ya existía:
+
+- Contrato de datos (app/esquemas.py) y tabla de rutas con roles.
+- Inicio de sesión, roles, usuarios y auditoría.
+- Primer despliegue en Render con la base en Supabase.
+- Cohortes, laboratorios y rúbricas (carga, validación y versiones).
+- Entregas y portafolio (PDF, ZIP, GitHub, imágenes y diapositivas).
+- Evaluador: la IA propone el nivel de cada criterio, se verifican las
+  citas, se filtra la inyección de prompt y el backend calcula la nota
+  de 0,0 a 5,0.
+- Sandbox para revisar el código (sintaxis, ruff y pruebas). En Render
+  solo corren sintaxis y ruff; las pruebas del estudiante corren en el
+  PC con Docker.
+- Configuración de la IA (OpenAI, Ollama u OpenRouter) y panel de costos.
+- Diseño elegido: Cordillera, guardado en docs/diseno/.
+- Los esquemas del informe, del mapa y de la revisión docente ya estaban
+  escritos, pero no tenían código detrás.
+- La carpeta frontend solo tenía un README. No había pantallas.
+
+
+2. Lo que se agregó
+
+Revisión docente (RF-14 y RF-15)
+
+- El docente ve una bandeja. Lo urgente (cita no encontrada, alerta de
+  inyección o criterio sin nivel) aparece primero.
+- Puede cambiar el nivel de un criterio. Tiene que escribir por qué.
+  La nota se vuelve a calcular en el backend. Con la rúbrica de prueba,
+  bajar el primer criterio de alto a bajo deja la nota en 3,7.
+- Puede aprobar y después publicar. El estudiante no ve la nota hasta
+  que está publicada.
+- La pestaña Traza guarda el valor anterior, el nuevo, la rúbrica, el
+  modelo, las evidencias y el resultado del sandbox.
+- Archivos: app/api/revision.py, tests/test_revision.py, tests/test_traza.py.
+
+Informe integrado (RF-16)
+
+- Junta los laboratorios publicados de las dos cohortes: notas, promedio,
+  nivel de dominio, brechas y, si la IA está configurada, un plan de
+  fortalecimiento.
+- Se puede ver en pantalla y descargar en PDF.
+- En Docker y en Render el PDF lo hace WeasyPrint. En Windows, si esas
+  librerías no están, el mismo texto lo escribe PyMuPDF (decisión D-21).
+- Archivos: app/informes/, app/api/informe.py, prompts/plan_fortalecimiento_v1.md,
+  tests/test_informe.py.
+
+Mapa mental (RF-17)
+
+- Une categoría, tema y laboratorio. Cada tema trae su nivel, evidencias
+  y qué profundizar.
+- En la pantalla se puede explorar y descargar en PNG y JSON.
+- Archivos: app/api/mapa.py, frontend/src/mapa/Grafo.tsx, tests/test_mapa.py.
+
+Página del proyecto y bitácora (RF-18 y RF-22)
+
+- Página pública con el resumen, las tecnologías, los aportes y el equipo:
+  Andrés Ospina Silva, Santiago Arias Aguirre y Jerónimo Aristizabal.
+- La bitácora de docs/bitacora-ia.md se puede leer desde la app.
+- Archivos: app/api/proyecto.py, tests/test_proyecto.py.
+
+Pantallas (diseño Cordillera)
+
+- Login, bandeja, revisión, informe, mapa, proyecto y bitácora.
+- React con Vite. El verde es el de la Universidad (#0B5D3B) y el acento
+  es el azul glaciar.
+- Si se corre "npm run build" en frontend/, la API sirve esas pantallas
+  en la misma dirección. El Dockerfile ya copia ese build para Render.
+- Carpeta: frontend/.
+
+Pruebas
+
+- La suite completa quedó en 1170 pruebas pasando (29 se saltan porque
+  dependen de Docker o de Linux).
+
+
+3. Lo que falta
+
+Para cerrar el trabajo del curso:
+
+- Fotos reales del equipo y el rol de Santiago y de Jerónimo. Hoy las
+  fotos dicen "[foto]" y esos dos roles dicen "Integrante del equipo".
+- La reflexión final de la bitácora (al final de docs/bitacora-ia.md).
+  La fila nueva de esta sesión tiene la decisión humana en "(completar)".
+- Pasada final de seguridad (OWASP) sobre todo el sistema.
+- Volver a construir la imagen de Docker, porque el Dockerfile cambió.
+- Despliegue final en Render para que la URL pública muestre las pantallas.
+- Subir estos cambios a GitHub. Todavía están solo en esta carpeta:
+  no hay commit ni pull request.
+
+Para probarlo en este PC:
+
+- Si al entrar dice que la petición no está permitida, en el .env la
+  variable ORIGENES_PERMITIDOS debe incluir http://127.0.0.1:8000.
+  En .env.example ya está. El .env real no se tocó.
+- La IA del plan de fortalecimiento no se probó con un modelo de pago.
+  Si no hay IA configurada, el informe sale igual, sin ese plan.
+
+Cómo verlo:
+
+    .\.venv\Scripts\python.exe -m uvicorn app.main:app --reload
+
+y abrir http://127.0.0.1:8000
