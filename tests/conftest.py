@@ -61,6 +61,12 @@ def motor():
             yield sesion
 
     app.dependency_overrides[obtener_db] = _db
+    # El evaluador corre en segundo plano con su propia sesión: que use la base de la prueba.
+    from app.api import evaluaciones
+
+    app.dependency_overrides[evaluaciones.obtener_fabrica] = lambda: (
+        lambda: Session(motor, expire_on_commit=False)
+    )
     seguridad.limitador.reset()
     yield motor
     app.dependency_overrides.clear()
@@ -207,3 +213,120 @@ def ia_simulada(motor):
     simulada = IASimulada()
     app.dependency_overrides[rubricas.obtener_ia] = lambda: simulada
     return simulada
+
+
+# ---------- Evaluador ----------
+
+
+@pytest.fixture
+def ia_evaluador(motor):
+    """IA simulada para el evaluador. Por defecto propone 'alto' en cada criterio, citando un
+    pedazo real del informe. `respuestas[criterio_id]` es una lista que se va gastando: cada
+    elemento es un dict (la respuesta), un str (texto crudo) o una excepción."""
+    import re
+
+    from archivos_prueba import TEXTO_INFORME
+
+    from app.api import evaluaciones
+    from app.esquemas import ConfigIA, DescripcionImagen
+    from app.ia.cliente import Uso, validar_respuesta
+
+    class IAEvaluador:
+        def __init__(self):
+            self.respuestas: dict[str, list] = {}
+            self.descripcion = "Captura de la consola: el agente movió 3 archivos a la carpeta imagenes."
+            self.error_imagen: Exception | None = None  # si se pone, describir la imagen falla
+            self.pedidos: list[dict] = []
+            self.uso = Uso(modelo="modelo-prueba", entrada=1000, salida=200)
+
+        def correcta(self, criterio_id: str, nivel: str = "alto") -> dict:
+            return {
+                "criterio_id": criterio_id,
+                "nivel_id": nivel,
+                "justificacion": "El informe explica cómo el agente usa herramientas.",
+                "evidencias": [
+                    {"archivo": "informe.pdf", "ubicacion": "página 1", "fragmento": TEXTO_INFORME[:60]}
+                ],
+                "fortalezas": ["Explica el agente con claridad"],
+                "debilidades": ["Faltan pruebas"],
+                "recomendaciones": ["Agregar pruebas unitarias"],
+            }
+
+        def __call__(self, sistema, usuario, esquema, *, config=None, imagenes=None, maximo_tokens=None):
+            self.pedidos.append(
+                {
+                    "sistema": sistema,
+                    "usuario": usuario,
+                    "esquema": esquema,
+                    "imagenes": imagenes,
+                    "config": config,
+                }
+            )
+            if esquema is DescripcionImagen:
+                if self.error_imagen is not None:
+                    raise self.error_imagen
+                return DescripcionImagen(descripcion=self.descripcion), self.uso
+            criterio_id = re.search(r'"id": "([^"]+)"', usuario).group(1)
+            pendientes = self.respuestas.get(criterio_id)
+            respuesta = pendientes.pop(0) if pendientes else self.correcta(criterio_id)
+            if isinstance(respuesta, Exception):
+                raise respuesta
+            texto = respuesta if isinstance(respuesta, str) else json.dumps(respuesta)
+            return validar_respuesta(texto, esquema), self.uso
+
+    simulada = IAEvaluador()
+    config = ConfigIA(proveedor="openai", modelo="modelo-prueba", base_url="https://api.openai.com/v1")
+    app.dependency_overrides[evaluaciones.obtener_ia] = lambda: simulada
+    app.dependency_overrides[evaluaciones.obtener_config] = lambda: config
+    app.dependency_overrides[evaluaciones.obtener_bajar_github] = lambda: simulada_github
+    simulada.github = simulada_github
+    return simulada
+
+
+class _GitHubSimulado:
+    """Reemplaza la descarga de GitHub: devuelve un ZIP de prueba o lanza lo que se le ponga."""
+
+    def __init__(self):
+        self.respuesta = None
+        self.pedidos: list[str] = []
+
+    def __call__(self, enlace: str) -> bytes:
+        from archivos_prueba import zip_codigo
+
+        self.pedidos.append(enlace)
+        if isinstance(self.respuesta, Exception):
+            raise self.respuesta
+        return self.respuesta or zip_codigo({"repo-main/agente.py": "def actuar():\n    return 'ok'\n"})
+
+
+simulada_github = _GitHubSimulado()
+
+
+@pytest.fixture(autouse=True)
+def _github_limpio():
+    simulada_github.respuesta = None
+    simulada_github.pedidos.clear()
+
+
+class _EjecutorInmediato:
+    """En las pruebas la evaluación corre ahí mismo: termina antes de que vuelva la respuesta."""
+
+    def __init__(self):
+        self.apagado = False
+
+    def submit(self, funcion, *args):
+        if self.apagado:
+            raise RuntimeError("cannot schedule new futures after shutdown")
+        funcion(*args)
+
+    def shutdown(self, wait=True, cancel_futures=False):
+        self.apagado = True
+
+
+@pytest.fixture(autouse=True)
+def _evaluador_inmediato(monkeypatch):
+    from app.evaluador import motor as motor_evaluador
+
+    monkeypatch.setattr(motor_evaluador, "_EJECUTOR", _EjecutorInmediato())
+    motor_evaluador._EN_COLA.clear()
+    motor_evaluador._CORRIENDO.clear()

@@ -4,7 +4,7 @@ import secrets
 from functools import lru_cache
 from typing import Literal, Self
 
-from pydantic import Field, SecretStr, model_validator
+from pydantic import Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 SECRETO_MINIMO = 32
@@ -28,6 +28,17 @@ class Ajustes(BaseSettings):
     llm_base_url: str = "https://api.openai.com/v1"
     llm_api_key: SecretStr = SecretStr("")
     llm_tiempo_seg: int = Field(default=60, ge=5, le=300)
+    # Cuánto "razona" un modelo de OpenAI antes de responder (reasoning_effort). "low" gasta
+    # poco; "none" desactiva el razonamiento. Vacío = no se manda (otros proveedores).
+    llm_esfuerzo: Literal["", "none", "low", "medium", "high"] = "low"
+    # Precio por millón de tokens del modelo (para el panel de costos, RF-20). Vacío = 0.
+    llm_precio_entrada_usd: float = Field(default=0, ge=0, allow_inf_nan=False)
+    llm_precio_salida_usd: float = Field(default=0, ge=0, allow_inf_nan=False)
+
+    @field_validator("llm_precio_entrada_usd", "llm_precio_salida_usd", mode="before")
+    @classmethod
+    def _precio_vacio(cls, valor: object) -> object:
+        return 0 if valor in ("", None) else valor
 
     # Archivos de las entregas (RNF-07). En el PC, una carpeta; en Render, Supabase Storage
     # (el disco de Render se borra en cada despliegue).

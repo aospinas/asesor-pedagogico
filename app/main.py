@@ -5,6 +5,7 @@ tabla de `app/api/rutas.py`. Los módulos se agregan con /modulo.
 """
 
 import logging
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request, status
 from fastapi.exceptions import RequestValidationError
@@ -15,16 +16,37 @@ from sqlalchemy.exc import OperationalError
 from starlette.exceptions import HTTPException as ErrorHTTP
 
 from app.almacen import AlmacenNoDisponible
-from app.api import auditoria, entregas, laboratorios, portafolio, rubricas, sesion, usuarios
+from app.api import (
+    auditoria,
+    config_ia,
+    entregas,
+    evaluaciones,
+    laboratorios,
+    portafolio,
+    rubricas,
+    sesion,
+    usuarios,
+)
 from app.api.seguridad import limitador, tiene_sesion_firmada
 from app.archivos.pdf import ServidorOcupado
 from app.config import ajustes
 from app.db import BaseNoDisponible
+from app.evaluador import motor as motor_evaluador
 from app.mensajes import explicar
 
 registro = logging.getLogger("asesor")
 
+
+@asynccontextmanager
+async def ciclo_de_vida(_app: FastAPI):
+    yield
+    # Al apagar (cada despliegue): las evaluaciones que esperan turno no se empiezan y pasan
+    # a revisión manual de una vez, en vez de quedar "En proceso" 30 minutos (D-18).
+    motor_evaluador.apagar()
+
+
 app = FastAPI(
+    lifespan=ciclo_de_vida,
     title="Asesor Pedagógico Inteligente",
     docs_url=None,  # OWASP A02: la documentación de la API no queda pública
     redoc_url=None,
@@ -188,3 +210,5 @@ app.include_router(laboratorios.router)
 app.include_router(rubricas.router)
 app.include_router(entregas.router)
 app.include_router(portafolio.router)
+app.include_router(evaluaciones.router)
+app.include_router(config_ia.router)

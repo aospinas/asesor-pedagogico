@@ -1,14 +1,25 @@
 """Tablas de la base de datos (SRS sección 8).
 
 Por ahora: usuarios, intentos de sesión, auditoría, cohortes, laboratorios, rúbricas,
-entregas y evidencias.
+entregas, evidencias, evaluaciones y la configuración de IA.
 """
 
 import uuid
 from datetime import UTC, datetime
 from typing import Any
 
-from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint, Uuid
+from sqlalchemy import (
+    JSON,
+    Boolean,
+    DateTime,
+    Float,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+    Uuid,
+)
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db import Base
@@ -166,7 +177,82 @@ class Evidencia(Base):
     tipo_mime: Mapped[str] = mapped_column(String(100))
     ruta_storage: Mapped[str] = mapped_column(String(300))
     # Se carga solo cuando hace falta (evaluar): puede pesar varios MB por archivo.
+    # En las imágenes lo llena el evaluador con la descripción de la IA (se guarda para no
+    # pagar dos veces): {"descripcion", "modelo", "prompt_version"}.
     texto_extraido: Mapped[dict[str, Any] | None] = mapped_column(JSON, default=None, deferred=True)
     # Lo que muestran las listas, calculado al subir: así no se lee el texto completo.
     resumen: Mapped[str | None] = mapped_column(String(300), default=None)
     fecha: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_ahora)
+
+
+class Evaluacion(Base):
+    """Una evaluación de una entrega con IA (RF-11 a RF-13, CU-04). La traza principal (C6).
+
+    La nota la escribe el backend con app/evaluador/nota.py; la IA solo propone niveles.
+    """
+
+    __tablename__ = "evaluaciones"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    entrega_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("entregas.id"), index=True)
+    rubrica_version_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("rubrica_versiones.id"))
+    lanzada_por: Mapped[uuid.UUID] = mapped_column(ForeignKey("usuarios.id"), index=True)
+    estado: Mapped[str] = mapped_column(String(20), index=True)
+    proveedor: Mapped[str] = mapped_column(String(20))
+    modelo: Mapped[str] = mapped_column(String(120))
+    version_prompt: Mapped[str] = mapped_column(String(60))
+    nota_preliminar: Mapped[float | None] = mapped_column(Float, default=None)
+    nota_final: Mapped[float | None] = mapped_column(Float, default=None)
+    tokens_entrada: Mapped[int] = mapped_column(Integer, default=0)
+    tokens_salida: Mapped[int] = mapped_column(Integer, default=0)
+    costo_usd: Mapped[float] = mapped_column(Float, default=0)
+    alerta_inyeccion: Mapped[bool] = mapped_column(Boolean, default=False)
+    # Qué reglas del filtro de inyección saltaron (ids nuestros, nunca el texto del estudiante)
+    reglas_inyeccion: Mapped[list[str]] = mapped_column(JSON, default=list)
+    # Aviso para el docente si algo no salió (texto nuestro, nunca la respuesta de la IA)
+    aviso: Mapped[str | None] = mapped_column(String(300), default=None)
+    fecha: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_ahora, index=True)
+    actualizada: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_ahora)
+    aprobada_por: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("usuarios.id"), default=None)
+    fecha_aprobacion: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+    fecha_publicacion: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+
+
+class EvaluacionCriterio(Base):
+    """Lo que propuso la IA para un criterio, con sus citas ya verificadas (RF-11, RF-12).
+
+    nivel_ia es None cuando la IA falló 3 veces: el criterio queda "Sin propuesta".
+    """
+
+    __tablename__ = "evaluacion_criterios"
+    __table_args__ = (UniqueConstraint("evaluacion_id", "criterio_id", name="uq_evaluacion_criterio"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    evaluacion_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("evaluaciones.id"), index=True)
+    criterio_id: Mapped[str] = mapped_column(String(40))
+    orden: Mapped[int] = mapped_column(Integer)
+    nivel_ia: Mapped[str | None] = mapped_column(String(40), default=None)
+    nivel_final: Mapped[str | None] = mapped_column(String(40), default=None)
+    justificacion: Mapped[str] = mapped_column(Text, default="")
+    evidencias: Mapped[list[dict[str, Any]]] = mapped_column(JSON, default=list)
+    fortalezas: Mapped[list[str]] = mapped_column(JSON, default=list)
+    debilidades: Mapped[list[str]] = mapped_column(JSON, default=list)
+    recomendaciones: Mapped[list[str]] = mapped_column(JSON, default=list)
+    intentos: Mapped[int] = mapped_column(Integer, default=0)
+
+
+class ConfigIAFila(Base):
+    """Proveedor y modelo de IA elegidos por el administrador (RF-19). La llave NO va aquí:
+    vive en la variable LLM_API_KEY. Cada cambio es una fila nueva; manda la última."""
+
+    __tablename__ = "config_ia"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    proveedor: Mapped[str] = mapped_column(String(20))
+    modelo: Mapped[str] = mapped_column(String(120))
+    base_url: Mapped[str] = mapped_column(String(300))
+    # Precio por millón de tokens de ESTE modelo (RF-20). Vacío: se usan LLM_PRECIO_*.
+    precio_entrada_usd: Mapped[float | None] = mapped_column(Float, nullable=True)
+    precio_salida_usd: Mapped[float | None] = mapped_column(Float, nullable=True)
+    actualizado_por: Mapped[uuid.UUID] = mapped_column(ForeignKey("usuarios.id"))
+    fecha: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_ahora, index=True)

@@ -29,7 +29,10 @@ def motor() -> Engine:
         raise BaseNoDisponible("Falta la variable DATABASE_URL.")
     # hide_parameters: si una consulta falla, los datos (por ejemplo el hash de una
     # contraseña) no quedan escritos en los registros del servidor.
-    return create_engine(direccion, pool_pre_ping=True, hide_parameters=True)
+    # connect_timeout: si la base no contesta, se sabe en 10 s y no se queda esperando (por
+    # ejemplo al apagar el servidor, cuando el evaluador cierra lo que quedó en cola; D-18).
+    extra = {"connect_args": {"connect_timeout": 10}} if direccion.startswith("postgresql") else {}
+    return create_engine(direccion, pool_pre_ping=True, hide_parameters=True, **extra)
 
 
 def obtener_db() -> Iterator[Session]:

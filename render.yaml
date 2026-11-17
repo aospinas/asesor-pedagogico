@@ -23,6 +23,14 @@ services:
         sync: false
       - key: LLM_TIEMPO_SEG
         value: "60"
+      # Cuánto "piensa" el modelo (solo OpenAI): none, low, medium o high.
+      - key: LLM_ESFUERZO
+        value: low
+      # Precio por millón de tokens del modelo elegido (panel de costos).
+      - key: LLM_PRECIO_ENTRADA_USD
+        sync: false
+      - key: LLM_PRECIO_SALIDA_USD
+        sync: false
       - key: DATABASE_URL
         sync: false
       - key: ALMACEN
