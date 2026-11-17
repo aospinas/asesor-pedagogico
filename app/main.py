@@ -21,6 +21,7 @@ from app.api import (
     config_ia,
     entregas,
     evaluaciones,
+    informe,
     laboratorios,
     portafolio,
     revision,
@@ -219,4 +220,5 @@ app.include_router(entregas.router)
 app.include_router(portafolio.router)
 app.include_router(evaluaciones.router)
 app.include_router(revision.router)
+app.include_router(informe.router)
 app.include_router(config_ia.router)

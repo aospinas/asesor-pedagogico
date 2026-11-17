@@ -182,8 +182,10 @@ Puntos que hay que conocer antes de tocar código:
   sandbox (`app/sandbox/`, D-18), que devuelve `list[VerificacionCodigo]` con
   `verificar(archivos)`; el motor del evaluador lo llama (D-20). Y la revisión del docente
   (`app/api/revision.py` y `app/evaluador/revision.py`, D-21): bandeja, ajustes con la nota
-  recalculada, aprobar, publicar, traza y la vista del estudiante. El paquete `informes`
-  está vacío y se llena en el orden de `docs/arranque-claude-code.md`.
+  recalculada, aprobar, publicar, traza y la vista del estudiante. Y el informe integrado y
+  el mapa mental (`app/informes/` y `app/api/informe.py`, D-22): números del backend, plan de
+  la IA guardado con huella y PDF con WeasyPrint (en Windows no carga: la ruta responde 503).
+  Falta el frontend.
 - **Cliente de IA:** `app/ia/cliente.py`. `configuracion(db)` toma la última fila de
   `config_ia` y, si no hay, las variables `LLM_*`. Con OpenAI manda
   `max_completion_tokens` y `reasoning_effort` (`LLM_ESFUERZO`) y solo pone

@@ -410,3 +410,23 @@ El módulo se hizo con **Opus 5.5**: Mythos 5.2 y Fable 5.2 no tenían créditos
 - **Bajos arreglados:** la bandeja tiene su límite de 120 consultas por minuto; una cita guardada sin todos sus campos no le llega al estudiante (antes daba 500); la auditoría de la retroalimentación guarda el antes y el después.
 - **Para el frontend:** avisar al docente que la justificación de un ajuste la verá el estudiante.
 
+## D-22 · Informe integrado y mapa mental (17-nov-2026)
+
+- **Sin tabla propia (SRS sección 8):** se calculan al momento desde las evaluaciones **publicadas**. Por cada laboratorio cuenta la publicada más reciente. Lo aprobado sin publicar no cuenta.
+- **Los números los calcula el backend** (`app/informes/calculo.py`): nota por laboratorio con su cohorte, promedio general, dominio por tema (promedio de los laboratorios donde aparece el tema) y brechas (temas en Básico o Por fortalecer). Decimal y redondeo comercial a un decimal, como la nota. Niveles del SRS: 4,5 a 5,0 Alto; 3,5 a 4,4 Medio; 3,0 a 3,4 Básico; menos de 3,0 Por fortalecer.
+- **Categorías de los temas:** los temas de un laboratorio se escriben "Categoría: tema" (por ejemplo "Agentes: uso de herramientas"); sin dos puntos van a "Otros temas". Así el mapa une categoría → tema → laboratorio sin una tabla nueva (Andrés lo aprobó en la Puerta 1).
+- **Plan de fortalecimiento (la IA solo redacta):** prompt `plan_fortalecimiento_v1`. Recibe dentro de `<datos>` (JSON con `<` escapado) solo lo calculado: títulos, cohortes, niveles, temas y brechas; nunca texto del estudiante ni notas por laboratorio. El esquema de salida no tiene nota. Las acciones sobre temas que no existen se descartan. Se guarda en la tabla nueva `planes_fortalecimiento` (migración 0007) con la huella SHA-256 de lo que recibió, el modelo y el prompt: solo se vuelve a pedir si cambian los datos (LLM10). Si la IA no está configurada o falla, el informe sale igual, sin plan.
+- **Mapa (RF-17):** JSON para Cytoscape.js. Ids que arma el backend (`cat:N`, `tema:N`, `lab:<uuid>`), nunca texto del docente. Cada tema trae su nivel y "qué profundizar" (del plan o, si no hay, las recomendaciones aprobadas); cada laboratorio, su nivel y hasta 5 citas **encontradas**. Zoom, búsqueda, filtro y descarga en PNG/JSON los hace el frontend.
+- **PDF:** WeasyPrint con los colores de Cordillera. Todo el texto se escapa y el `url_fetcher` no baja nada de afuera (SSRF). Uno a la vez (Render tiene 512 MB). En Windows sin GTK no carga: la ruta responde 503 con aviso. El CI ahora instala las librerías de WeasyPrint para probar el PDF de verdad.
+- **Acceso:** el estudiante solo ve lo suyo (lo ajeno: 404 y `acceso_ajeno_denegado`); el docente, el de cualquier estudiante. Topes: 20 consultas y 5 PDF por minuto por usuario.
+
+**Revisión (Puerta 2):** los dos revisores dijeron que podía pasar; se arreglaron sus hallazgos medios:
+
+- **El plan no se pide en cada visita si la IA falla:** el intento fallido también se guarda (sin plan, con sus tokens) y esa huella no se reintenta antes de 30 minutos. Solo `/api/informe` le pide el plan a la IA; el mapa y el PDF usan el guardado. La lectura se cierra antes de llamar a la IA.
+- **Costos (RF-20):** cada plan guarda tokens y `costo_usd`, y el panel `/api/costos` los suma al total y los muestra aparte (`planes_*`).
+- **Competencias (RF-16):** el informe trae el dominio por competencia de las rúbricas: cada criterio aporta su nivel final llevado a 0-5 (valor del nivel / valor máximo × 5), con la rúbrica de la versión evaluada.
+- **Evolución por cohorte (SRS sección 9):** el informe trae el promedio y el nivel de cada cohorte, calculados por el backend.
+- **Bajos:** decimales con coma en las brechas y el PDF; el PDF revisa antes que WeasyPrint cargue (no se gasta nada si no puede); en WeasyPrint 70 el bloqueo de direcciones es un `URLFetcher` sin protocolos; la huella del plan incluye proveedor y dirección.
+- **Para el frontend:** en el mapa, `fragmento` y `archivo` son texto del estudiante, y `etiqueta`, `que_profundizar` y el plan, texto del docente o de la IA: se muestran como texto, nunca como HTML.
+- **Cambia el contrato:** `Informe` suma `cohortes` y `competencias`; `Costos` suma `planes_*`; `planes_fortalecimiento` suma `costo_usd` (la migración 0007 aún no estaba en main).
+

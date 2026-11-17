@@ -551,8 +551,8 @@ Cada punto del enunciado tiene su requisito, el módulo donde vive y la prueba q
 | F2 Portafolio académico | RF-06, RF-08 | `app/api/portafolio.py` | `tests/test_portafolio.py`: entrega guarda versión de rúbrica | Hecho |
 | F3 Gestión de rúbricas | RF-04, RF-05 | `app/rubricas/` | `tests/test_rubricas.py`: pesos que suman 90 % bloquean | Hecho |
 | F4 Evaluación inteligente | RF-09 a RF-14 | `app/evaluador/` | `tests/test_evaluador.py` con respuesta de IA simulada; `tests/test_evaluador_sandbox.py` con el sandbox conectado | Hecho (D-19, D-20, D-21; la pantalla de revisión va con el frontend) |
-| F5 Informe integrado | RF-16 | `app/informes/` | `tests/test_informe.py`: PDF generado con 2 cohortes | Pendiente |
-| F6 Mapa mental | RF-17 | `frontend/src/mapa/`, `app/api/mapa.py` | `tests/test_mapa.py`: JSON con temas, labs y nivel | Pendiente |
+| F5 Informe integrado | RF-16 | `app/informes/`, `app/api/informe.py` | `tests/test_informe.py`: informe con 2 cohortes y PDF | API hecha (D-22); falta la pantalla |
+| F6 Mapa mental | RF-17 | `frontend/src/mapa/`, `app/api/informe.py` | `tests/test_mapa.py`: JSON con temas, labs y nivel | API hecha (D-22); falta la pantalla |
 | F7 Proyecto y equipo | RF-18 | `frontend/src/paginas/Proyecto.tsx` | Revisión manual | Pendiente |
 | C1 Uso intensivo de IA | RF-22, RNF-13 | `docs/bitacora-ia.md` | Bitácora con una entrada por módulo | Pendiente |
 | C2 Evaluación estructurada | RNF-01, RNF-02 | `app/esquemas.py`, `app/evaluador/nota.py` | `tests/test_nota.py`: 5 casos de la fórmula | Pendiente |

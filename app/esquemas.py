@@ -639,6 +639,25 @@ class DominioTema(Estricto):
     laboratorios: list[UUID]
 
 
+class ResultadoCohorte(Estricto):
+    """Evolución entre cohortes (RF-16): el promedio lo calcula el backend."""
+
+    cohorte: str
+    promedio: float = Field(ge=NOTA_MINIMA, le=NOTA_MAXIMA, allow_inf_nan=False)
+    nivel: NivelDominio
+    laboratorios: list[UUID]
+
+
+class DominioCompetencia(Estricto):
+    """Dominio de una competencia de las rúbricas (RF-16): cada criterio aporta su nivel final
+    llevado a 0-5 (valor del nivel / valor máximo del criterio × 5)."""
+
+    competencia: str
+    promedio: float = Field(ge=NOTA_MINIMA, le=NOTA_MAXIMA, allow_inf_nan=False)
+    nivel: NivelDominio
+    laboratorios: list[UUID]
+
+
 class Informe(Estricto):
     """Informe integrado. Los números los calcula el backend; la IA solo redacta el plan."""
 
@@ -646,6 +665,8 @@ class Informe(Estricto):
     nombre_estudiante: str
     laboratorios: list[ResultadoLaboratorio]
     promedio_general: float | None = Field(ge=NOTA_MINIMA, le=NOTA_MAXIMA, allow_inf_nan=False)
+    cohortes: list[ResultadoCohorte] = Field(default_factory=list)
+    competencias: list[DominioCompetencia] = Field(default_factory=list)
     temas: list[DominioTema]
     brechas: list[str]
     plan: PlanFortalecimiento | None
@@ -776,12 +797,16 @@ class CostoEvaluacion(Estricto):
 
 
 class Costos(Estricto):
-    """Panel de costos (RF-20): totales y las evaluaciones de la página pedida."""
+    """Panel de costos (RF-20): totales (evaluaciones + planes del informe) y las evaluaciones de
+    la página pedida. Los planes de fortalecimiento van también aparte (D-22)."""
 
     tokens_entrada: int = Field(ge=0)
     tokens_salida: int = Field(ge=0)
     costo_usd: float = Field(ge=0, allow_inf_nan=False)
     evaluaciones: list[CostoEvaluacion]
+    planes_tokens_entrada: int = Field(default=0, ge=0)
+    planes_tokens_salida: int = Field(default=0, ge=0)
+    planes_costo_usd: float = Field(default=0, ge=0, allow_inf_nan=False)
 
 
 class RegistroAuditoria(Estricto):
