@@ -81,6 +81,11 @@ ESPERADAS_EN_REVISION = {
     ("GET", "/api/evaluaciones/{evaluacion_id}/traza"),
     ("GET", "/api/evaluaciones/{evaluacion_id}/publicada"),
 }
+ESPERADAS_EN_INFORME = {
+    ("GET", "/api/informe/{estudiante_id}"),
+    ("GET", "/api/informe/{estudiante_id}/pdf"),
+    ("GET", "/api/mapa/{estudiante_id}"),
+}
 
 
 def camino(ruta: str) -> str:
@@ -99,6 +104,7 @@ def test_las_rutas_de_este_modulo_ya_existen():
         | ESPERADAS_EN_ENTREGAS
         | ESPERADAS_EN_EVALUADOR
         | ESPERADAS_EN_REVISION
+        | ESPERADAS_EN_INFORME
     )
     assert set(CONSTRUIDAS) >= esperadas
 

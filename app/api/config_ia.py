@@ -18,7 +18,7 @@ from app.config import ajustes
 from app.esquemas import ConfigIA, ConfigIAVista, CostoEvaluacion, Costos, ProveedorIA, PruebaConexion
 from app.ia import cliente
 from app.ia.cliente import ErrorIA
-from app.modelos import ConfigIAFila
+from app.modelos import ConfigIAFila, PlanFortalecimientoFila
 from app.modelos import Evaluacion as EvaluacionFila
 
 router = APIRouter()
@@ -157,6 +157,14 @@ def ver_costos(db: Db, desde: Desde = 0, limite: Limite = LISTA_POR_DEFECTO) -> 
             func.coalesce(func.sum(EvaluacionFila.costo_usd), 0.0),
         )
     ).one()
+    # Los planes del informe también gastan tokens (D-22)
+    p_entrada, p_salida, p_total = db.execute(
+        select(
+            func.coalesce(func.sum(PlanFortalecimientoFila.tokens_entrada), 0),
+            func.coalesce(func.sum(PlanFortalecimientoFila.tokens_salida), 0),
+            func.coalesce(func.sum(PlanFortalecimientoFila.costo_usd), 0.0),
+        )
+    ).one()
     filas = db.scalars(
         select(EvaluacionFila)
         .order_by(EvaluacionFila.fecha.desc(), EvaluacionFila.id.desc())
@@ -164,9 +172,12 @@ def ver_costos(db: Db, desde: Desde = 0, limite: Limite = LISTA_POR_DEFECTO) -> 
         .limit(limite)
     )
     return Costos(
-        tokens_entrada=int(entrada),
-        tokens_salida=int(salida),
-        costo_usd=round(float(total), 6),
+        tokens_entrada=int(entrada) + int(p_entrada),
+        tokens_salida=int(salida) + int(p_salida),
+        costo_usd=round(float(total) + float(p_total), 6),
+        planes_tokens_entrada=int(p_entrada),
+        planes_tokens_salida=int(p_salida),
+        planes_costo_usd=round(float(p_total), 6),
         evaluaciones=[
             CostoEvaluacion(
                 evaluacion_id=f.id,

@@ -261,6 +261,27 @@ class RevisionDocenteFila(Base):
     fecha: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_ahora)
 
 
+class PlanFortalecimientoFila(Base):
+    """El plan que redactó la IA para un estudiante (RF-16), guardado con la huella de los datos
+    que recibió: solo se vuelve a pedir si cambian las notas (no se pagan tokens en cada visita)."""
+
+    __tablename__ = "planes_fortalecimiento"
+    __table_args__ = (UniqueConstraint("estudiante_id", "huella", name="uq_plan_estudiante_huella"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    estudiante_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("usuarios.id"), index=True)
+    huella: Mapped[str] = mapped_column(String(64))
+    plan: Mapped[dict[str, Any]] = mapped_column(JSON)
+    proveedor: Mapped[str] = mapped_column(String(20))
+    modelo: Mapped[str] = mapped_column(String(120))
+    version_prompt: Mapped[str] = mapped_column(String(60))
+    tokens_entrada: Mapped[int] = mapped_column(Integer, default=0)
+    tokens_salida: Mapped[int] = mapped_column(Integer, default=0)
+    costo_usd: Mapped[float] = mapped_column(Float, default=0.0)
+    # Vacío = el último intento falló; no se reintenta antes de 30 minutos (D-22)
+    fecha: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_ahora)
+
+
 class VerificacionCodigoFila(Base):
     """Un resultado del sandbox para una evaluación (RF-10, SRS sección 8). La salida trae
     texto del estudiante (rutas, lo que imprimen sus pruebas): se muestra como texto escapado y

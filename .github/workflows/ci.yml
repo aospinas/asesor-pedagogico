@@ -24,6 +24,9 @@ jobs:
           python-version: ${{ matrix.python }}
           allow-prereleases: true
 
+      - name: Librerías de WeasyPrint (para probar el informe en PDF, D-22)
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libpango-1.0-0 libpangoft2-1.0-0 libharfbuzz0b fonts-dejavu-core
+
       - name: Instalar dependencias
         run: pip install -r requirements-dev.txt
 
