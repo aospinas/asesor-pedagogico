@@ -40,7 +40,17 @@ export type Nivel = { id: string; nombre: string; descriptor: string; valor: num
 export type Criterio = { id: string; nombre: string; competencia: string; peso: number; niveles: Nivel[] };
 export type RubricaEstructura = { laboratorio: string; criterios: Criterio[] };
 export type RubricaPublica = { numero: number; estructura: RubricaEstructura; fecha: string };
-export type RubricaVersion = { id: string; numero: number; estructura: RubricaEstructura };
+export type RubricaVersion = {
+  id: string;
+  numero: number;
+  estructura: RubricaEstructura;
+  valida: boolean;
+  errores: string[];
+  origen: string;
+  por_confirmar: boolean;
+  fecha: string;
+};
+export type Cohorte = { id: string; nombre: string; periodo: string };
 
 export type Cita = { archivo: string; ubicacion: string; fragmento: string };
 export type CitaVerificada = Cita & { encontrada: boolean | null };

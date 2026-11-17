@@ -2,7 +2,10 @@ import { useEffect, useState } from "react";
 import { NavLink, Navigate, Route, Routes, useNavigate } from "react-router-dom";
 import { api, type Rol, type Sesion } from "./api";
 import { Curvas } from "./componentes";
+import Admin from "./paginas/Admin";
 import Bandeja from "./paginas/Bandeja";
+import Laboratorio from "./paginas/Laboratorio";
+import Laboratorios from "./paginas/Laboratorios";
 import Clave from "./paginas/Clave";
 import Entregas from "./paginas/Entregas";
 import Informe from "./paginas/Informe";
@@ -18,8 +21,11 @@ const MENU: Record<Rol, { a: string; texto: string }[]> = {
     { a: "/informe", texto: "Mi informe" },
     { a: "/mapa", texto: "Mapa mental" },
   ],
-  docente: [{ a: "/bandeja", texto: "Bandeja" }],
-  administrador: [],
+  docente: [
+    { a: "/laboratorios", texto: "Laboratorios" },
+    { a: "/bandeja", texto: "Bandeja" },
+  ],
+  administrador: [{ a: "/admin", texto: "Usuarios" }],
 };
 
 export default function App() {
@@ -87,6 +93,9 @@ export default function App() {
             <Route path="/publicada/:id" element={solo("estudiante", <Publicada />)} />
             <Route path="/bandeja" element={solo("docente", <Bandeja />)} />
             <Route path="/revision/:id" element={solo("docente", <Revision />)} />
+            <Route path="/laboratorios" element={solo("docente", <Laboratorios />)} />
+            <Route path="/laboratorios/:id" element={solo("docente", <Laboratorio />)} />
+            <Route path="/admin" element={solo("administrador", <Admin yo={sesion?.usuario.id ?? ""} />)} />
             <Route path="*" element={<Navigate to="/" />} />
           </Routes>
         )}
