@@ -14,7 +14,7 @@
 import json
 from dataclasses import dataclass, field
 
-from app.esquemas import TipoEvidencia
+from app.esquemas import TipoEvidencia, VerificacionCodigo
 from app.evaluador.citas import Documento
 from app.modelos import Evidencia
 
@@ -23,6 +23,30 @@ MAXIMO_POR_ARCHIVO_CODIGO = 12_000
 # Lo que ocupa la estructura del JSON de cada parte (claves, sangría, número de página...).
 # Sin contarlo, cientos de archivos pequeños pasaban el tope (D-19).
 COSTO_POR_PARTE = 60
+# Cada salida del sandbox se guarda entera (hasta 20.000), pero a la IA le llega con estos
+# topes, medidos ya escapados (un "<" ocupa 6): las verificaciones van primero en el cupo y no
+# deben dejar sin lugar al informe (D-20).
+MAXIMO_SALIDA_VERIFICACION = 3_000
+MAXIMO_VERIFICACIONES = 12_000
+VERIFICACION_RECORTADA = "\n... (salida recortada)"
+
+
+def _largo_escapado(texto: str) -> int:
+    return len(_escapar(texto)) - 2  # sin las comillas del JSON
+
+
+def _recortar_escapado(texto: str, tope: int) -> str:
+    """Lo más largo del comienzo de `texto` que, ya escapado, mide como mucho `tope`."""
+    if _largo_escapado(texto) <= tope:
+        return texto
+    bajo, alto = 0, min(len(texto), tope)  # búsqueda binaria: unas 12 vueltas
+    while bajo < alto:
+        medio = (bajo + alto + 1) // 2
+        if _largo_escapado(texto[:medio]) <= tope:
+            bajo = medio
+        else:
+            alto = medio - 1
+    return texto[:bajo] + VERIFICACION_RECORTADA
 
 
 @dataclass
@@ -53,7 +77,7 @@ def _nombre_unico(nombre: str, tipo: str, documentos: dict[str, Documento]) -> s
     return candidato
 
 
-def armar(evidencias: list[Evidencia], verificaciones: list[dict] | None = None) -> Material:
+def armar(evidencias: list[Evidencia], verificaciones: list[VerificacionCodigo] | None = None) -> Material:
     partes: list[dict] = []
     documentos: dict[str, Documento] = {}
     plano: list[str] = []
@@ -68,6 +92,28 @@ def armar(evidencias: list[Evidencia], verificaciones: list[dict] | None = None)
             return False
         usado += largo
         return True
+
+    # Resultados del sandbox (RF-10): van primero y con tope por salida. Traen texto del
+    # estudiante (rutas, lo que imprimen sus pruebas): van escapados como todo lo demás y
+    # pasan por el filtro de inyección (LLM01).
+    resultados: list[dict] = []
+    tope_verificaciones = usado + MAXIMO_VERIFICACIONES
+    for v in verificaciones or []:
+        salida = _recortar_escapado(v.salida, MAXIMO_SALIDA_VERIFICACION)
+        largo = len(_escapar(v.comando)) + len(_escapar(salida)) + 2 * COSTO_POR_PARTE
+        if usado + largo > tope_verificaciones or not cabe(v.comando, salida):
+            recortado = True
+            continue
+        resultados.append(
+            {
+                "tipo": v.tipo.value,
+                "comando": v.comando,
+                "codigo_salida": v.codigo_salida,
+                "tiempo_agotado": v.tiempo_agotado,
+                "salida": salida,
+            }
+        )
+        plano.extend([v.comando, salida])
 
     # Orden: informe, diapositivas, código, imágenes (lo que más pesa en la rúbrica va primero)
     orden = {"pdf": 0, "diapositivas": 1, "codigo": 2, "imagen": 3}
@@ -95,6 +141,10 @@ def armar(evidencias: list[Evidencia], verificaciones: list[dict] | None = None)
             partes.append({"archivo": nombre, "tipo": evidencia.tipo, "partes": incluidas})
         elif evidencia.tipo == TipoEvidencia.CODIGO.value:
             for archivo in extraido.get("archivos", []):
+                if not isinstance(archivo, dict) or not isinstance(archivo.get("ruta"), str):
+                    continue  # guardado mal: se salta, no tumba la evaluación (RNF-10)
+                if not isinstance(archivo.get("texto"), str):
+                    continue
                 ruta = _nombre_unico(archivo["ruta"], "codigo", documentos)
                 texto = archivo["texto"]
                 numerado, lineas = _con_lineas(texto[:MAXIMO_POR_ARCHIVO_CODIGO])
@@ -122,7 +172,7 @@ def armar(evidencias: list[Evidencia], verificaciones: list[dict] | None = None)
                 else:
                     recortado = True
 
-    cuerpo = {"archivos": partes, "verificaciones_codigo": verificaciones or [], "recortado": recortado}
+    cuerpo = {"archivos": partes, "verificaciones_codigo": resultados, "recortado": recortado}
     # ensure_ascii=False para que las tildes se lean bien; luego se escapa cada "<".
     datos = json.dumps(cuerpo, ensure_ascii=False, indent=1).replace("<", "\\u003c")
     return Material(

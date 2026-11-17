@@ -25,11 +25,13 @@ from app.esquemas import (
     EvidenciaVerificada,
     MotivoPrioridad,
     ProveedorIA,
+    TipoVerificacion,
+    VerificacionCodigo,
 )
 from app.evaluador import github, motor
 from app.ia import cliente
 from app.ia.cliente import ErrorIA
-from app.modelos import Entrega, EvaluacionCriterio
+from app.modelos import Entrega, EvaluacionCriterio, VerificacionCodigoFila
 from app.modelos import Evaluacion as EvaluacionFila
 
 router = APIRouter()
@@ -60,6 +62,13 @@ def obtener_ia() -> motor.PedirJson:
 
 def obtener_bajar_github():
     return github.bajar_zip
+
+
+def obtener_verificar():
+    """El sandbox (RF-10). Las pruebas lo cambian: el de verdad necesita Docker o Linux."""
+    from app.sandbox import verificar
+
+    return verificar
 
 
 def obtener_config(db: Db) -> ConfigIA:
@@ -113,7 +122,21 @@ def a_esquema(db: Db, evaluacion: EvaluacionFila) -> Evaluacion:
             )
             for c in criterios
         ],
-        verificaciones=[],  # las llena el módulo sandbox (RF-10)
+        verificaciones=[
+            VerificacionCodigo(
+                tipo=TipoVerificacion(f.tipo),
+                comando=f.comando,
+                codigo_salida=f.codigo_salida,
+                salida=f.salida,
+                duracion_ms=f.duracion_ms,
+                tiempo_agotado=f.tiempo_agotado,
+            )
+            for f in db.scalars(
+                select(VerificacionCodigoFila)
+                .where(VerificacionCodigoFila.evaluacion_id == evaluacion.id)
+                .order_by(VerificacionCodigoFila.orden)
+            )
+        ],
         nota_preliminar=evaluacion.nota_preliminar,
         nota_final=evaluacion.nota_final,
         tokens_entrada=evaluacion.tokens_entrada,
@@ -150,6 +173,7 @@ def lanzar_evaluacion(
     fabrica: Annotated[object, Depends(obtener_fabrica)],
     pedir: Annotated[object, Depends(obtener_ia)],
     bajar_github: Annotated[object, Depends(obtener_bajar_github)],
+    verificar: Annotated[object, Depends(obtener_verificar)],
 ) -> Evaluacion:
     motor.recuperar_colgadas(db)
     # La fila de la entrega queda bloqueada hasta el commit: dos docentes que pulsan
@@ -216,7 +240,12 @@ def lanzar_evaluacion(
         motor.encolar(
             evaluacion.id,
             motor.Contexto(
-                fabrica=fabrica, pedir=pedir, almacen=almacen, config=config, bajar_github=bajar_github
+                fabrica=fabrica,
+                pedir=pedir,
+                almacen=almacen,
+                config=config,
+                bajar_github=bajar_github,
+                verificar=verificar,
             ),
         )
 

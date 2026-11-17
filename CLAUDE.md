@@ -180,7 +180,7 @@ Puntos que hay que conocer antes de tocar código:
   laboratorios, carga con IA y versiones) y el de entregas (subida, portafolio,
   almacén de archivos), el evaluador (motor, configuración de IA, costos; D-19) y el
   sandbox (`app/sandbox/`, D-18), que devuelve `list[VerificacionCodigo]` con
-  `verificar(archivos)`; todavía no está conectado al evaluador. El paquete `informes`
+  `verificar(archivos)`; el motor del evaluador lo llama (D-20). El paquete `informes`
   está vacío y se llena en el orden de `docs/arranque-claude-code.md`.
 - **Cliente de IA:** `app/ia/cliente.py`. `configuracion(db)` toma la última fila de
   `config_ia` y, si no hay, las variables `LLM_*`. Con OpenAI manda
@@ -189,10 +189,13 @@ Puntos que hay que conocer antes de tocar código:
 - **Evaluador:** `app/evaluador/motor.py` corre en un grupo de hilos propio (dos a la vez,
   máximo 20 en cola y 5 por docente; la ruta llama `motor.reservar` y luego `motor.encolar`) y
   evalúa criterio por criterio: baja GitHub (`github.py`), describe imágenes
-  (`imagenes.py`), arma el material escapado (`material.py`), marca inyección
+  (`imagenes.py`), verifica el código con el sandbox (`contexto.verificar`, un turno a la
+  vez; las salidas van a la tabla `verificaciones_codigo` y a la IA como datos), arma el
+  material escapado (`material.py`), marca inyección
   (`inyeccion.py`), verifica citas (`citas.py`) y calcula con `calcular_nota`. La IA
   nunca ve pesos ni notas. Cualquier falla deja la evaluación en `revision_manual`.
-  En las pruebas: fixture `ia_evaluador` (respuestas por criterio) y `simulada_github`; el
+  En las pruebas: fixture `ia_evaluador` (respuestas por criterio), `simulada_github` y
+  `simulado_sandbox` (el sandbox de verdad solo corre en `test_sandbox.py`); el
   fixture autouse `_evaluador_inmediato` cambia el grupo de hilos por uno que corre la
   evaluación ahí mismo (termina antes de que vuelva la respuesta) y vacía la cola.
 - **Rúbricas:** la versión vigente es la de número más alto; para evaluar se usa

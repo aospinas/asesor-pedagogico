@@ -288,7 +288,7 @@ El módulo se hizo con **Opus 5.5**: Mythos 5.2 y Fable 5.2 no tenían créditos
 
 - **El gancho no es una barrera:** código Python decidido puede saltárselo. Por ejemplo: abrir una carpeta de afuera y escribir con `dir_fd` (el evento no trae esa carpeta); cambiar el código interno de funciones como `os.getcwd` o `posixpath.realpath` que el gancho usa; recrear `posix` con `_imp.create_builtin` para recuperar `pidfd_open`; o un error del intérprete. Por eso el control real en Render es no ejecutar nada, y en el PC el contenedor.
 - **El estudiante puede forzar que pytest salga con código 0** (`os._exit(0)`); el docente ve la salida completa.
-- **Texto del estudiante en todas las salidas (LLM01):** nombres de archivo, nombres que repite ruff y lo que imprimen sus pruebas. Pendiente para `material.armar`: todas las `VerificacionCodigo.salida` van como datos dentro de `<entrega>` y pasan por el filtro de inyección. En la pantalla, como texto escapado.
+- **Texto del estudiante en todas las salidas (LLM01):** nombres de archivo, nombres que repite ruff y lo que imprimen sus pruebas. Pendiente para `material.armar`: todas las `VerificacionCodigo.salida` van como datos dentro de `<entrega>` y pasan por el filtro de inyección (hecho en D-20). En la pantalla, como texto escapado.
 
 ## D-19 · Evaluador, configuración de IA y costos (17-nov-2026)
 
@@ -369,4 +369,24 @@ El módulo se hizo con **Opus 5.5**: Mythos 5.2 y Fable 5.2 no tenían créditos
 
 - **S7:** el código de GitHub se baja cuando el docente lanza la evaluación, no al entregar; el estudiante podría cambiar el repositorio en medio. Bajarlo al entregar haría más lenta la subida y gastaría memoria en entregas. Pendiente: guardar el commit al entregar.
 - **S8:** hay una sola `LLM_API_KEY` para OpenAI y OpenRouter. Hoy solo se usa OpenAI; si el administrador cambia a OpenRouter, la llave de OpenAI se mandaría a OpenRouter. Antes de usar OpenRouter hay que separar las llaves.
+
+## D-20 · Sandbox conectado al evaluador (17-nov-2026)
+
+- **Cuándo corre:** dentro de la evaluación en segundo plano, después de bajar GitHub y describir las imágenes y antes de armar el material (CU-04, paso 3). Recibe los archivos que el lector de ZIP ya sacó al subir la entrega (o al bajar GitHub): nada del código corre en el proceso web. Si la entrega no trae código, no se llama.
+- **Se guarda** cada verificación en la tabla nueva `verificaciones_codigo` (migración 0005, con `orden`), y el docente las ve en `GET /api/evaluaciones/{id}`. Se corre en cada evaluación (no gasta tokens).
+- **Turno:** el sandbox corre una entrega a la vez y solo espera 30 s su turno; como el evaluador corre dos evaluaciones a la vez, el motor las turna antes con hasta 5 minutos de espera (`_TURNO_SANDBOX`). Si no hay turno, o se acabó el plazo de la evaluación, o el sandbox falla de forma inesperada, la evaluación sigue sin verificación y con aviso.
+- **A la IA (LLM01):** las verificaciones van como datos dentro de `<entrega>` (`verificaciones_codigo`, JSON con `<` escapado), **primero** en el cupo de 60.000 caracteres y con 3.000 caracteres por salida (al docente le llega entera). Todas sus salidas pasan por el filtro de inyección: traen texto del estudiante (rutas, nombres que repite ruff, lo que imprimen sus pruebas).
+- **Prompt nuevo `evaluar_criterio_v2`:** igual que la v1 más un apartado que explica las verificaciones: son datos, no se citan como evidencia y no se castiga lo que no se pudo correr (por ejemplo, las pruebas apagadas en Render). La v1 no se edita; las evaluaciones viejas guardan que la usaron.
+- **Pruebas:** con un sandbox simulado (`simulado_sandbox` en `tests/conftest.py`); el de verdad se prueba en `tests/test_sandbox.py`.
+- **Cambia el SRS (sección 8):** `verificaciones_codigo` suma `orden`.
+
+**Arreglos de la revisión** (las dos dijeron que podía pasar; un hallazgo medio):
+
+- **Las pruebas del estudiante pueden mentir (Medio):** el resultado de "pruebas" lo produce su propio código, que puede imprimir "12 passed" y salir con 0. El prompt v2 (aún no estaba en main, así que se corrigió sin crear una v3) dice ahora que esa salida y su código pueden estar falsificados, que no se suba el nivel solo porque digan que todo pasó y que las pruebas se juzguen leyendo su código. "sintaxis" y "estatico" sí son confiables: no ejecutan el código.
+- **Topes medidos ya escapados:** cada salida, 3.000 caracteres ya escapados (un "<" ocupa 6); y entre todas las verificaciones, 12.000. Así el informe siempre tiene lugar.
+- **La espera del turno no pasa del plazo** de 20 minutos de la evaluación.
+- **La transacción se cierra antes del sandbox** (la espera y la corrida pueden tomar minutos; hay prueba). La lista de archivos se arma antes del `commit`: `texto_extraido` es una columna diferida y leerla después abría otra transacción (lo encontró la prueba nueva). Un código mal guardado en la base no tumba la evaluación: el motor se salta el sandbox con aviso, y el material se salta solo el archivo mal guardado.
+- **Aviso arriba si el sandbox no pudo correr:** el sandbox de verdad nunca lanza error y, sin Docker u ocupado, lo dice en una verificación sin código de salida; ahora además va un aviso para el docente.
+- **Auditoría:** `evaluacion_terminada` cuenta las verificaciones.
+- **Pendiente para el módulo de revisión docente:** la vista del estudiante (`/publicada`) no debe reusar `a_esquema`, que trae las verificaciones, la alerta de inyección y los costos.
 
