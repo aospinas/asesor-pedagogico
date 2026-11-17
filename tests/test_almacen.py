@@ -178,9 +178,31 @@ def test_la_app_usa_un_solo_almacen(monkeypatch):
         a.obtener_almacen.cache_clear()
 
 
-def test_una_direccion_con_salto_de_linea_no_pasa():
-    with pytest.raises(a.AlmacenNoDisponible):
-        a.AlmacenSupabase(URL + "\n", "llave", "evidencias")
+@pytest.mark.parametrize("pegada", [URL + "\n", URL + " ", "  " + URL + "/\r\n", URL + "/"])
+def test_los_espacios_y_saltos_de_linea_de_los_bordes_se_recortan(pegada):
+    """Al pegar el valor en Render se cuelan espacios o un salto de línea al final."""
+    almacen = a.AlmacenSupabase(pegada, "  llave \n", "evidencias")
+    assert almacen.base == URL + "/storage/v1"
+    assert almacen._llave == "llave"
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        URL + "\nhttps://evil.co",
+        URL + "/rest/v1",
+        "postgresql://u:c@db.abcdefghijklmnop.supabase.co:5432/postgres",
+    ],
+)
+def test_lo_que_sobra_despues_de_la_direccion_no_pasa(url):
+    with pytest.raises(a.AlmacenNoDisponible, match="SUPABASE_URL") as error:
+        a.AlmacenSupabase(url, "llave", "evidencias")
+    assert "evil" not in str(error.value) and "u:c" not in str(error.value)  # nunca el valor
+
+
+def test_el_aviso_dice_que_falta_la_llave():
+    with pytest.raises(a.AlmacenNoDisponible, match="SUPABASE_SERVICE_KEY"):
+        a.AlmacenSupabase(URL, "   ", "evidencias")
 
 
 @pytest.mark.parametrize(

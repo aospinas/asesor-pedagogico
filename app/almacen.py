@@ -112,10 +112,19 @@ def leer_token(token: str) -> dict | None:
 
 class AlmacenSupabase:
     def __init__(self, url: str, llave: str, bucket: str, cliente: httpx.Client | None = None):
-        # fullmatch y no match: con match, "https://x.supabase.co\n" también pasaba.
-        if not PATRON_SUPABASE.fullmatch(url.rstrip("/")) or not llave:
-            raise AlmacenNoDisponible("Supabase Storage no está configurado.")
-        self.base = url.rstrip("/") + "/storage/v1"
+        # Los espacios y saltos de línea de los bordes se quitan: se cuelan al pegar el valor
+        # en Render. Después se exige la forma exacta (fullmatch: nada antes ni después).
+        url = url.strip().rstrip("/")
+        llave = llave.strip()
+        # El mensaje dice QUÉ variable falla, nunca su valor (va al registro del servidor).
+        if not PATRON_SUPABASE.fullmatch(url):
+            raise AlmacenNoDisponible(
+                "Supabase Storage no está configurado: SUPABASE_URL debe ser exactamente "
+                "https://<ref>.supabase.co (Project Settings > Data API > Project URL)."
+            )
+        if not llave:
+            raise AlmacenNoDisponible("Supabase Storage no está configurado: falta SUPABASE_SERVICE_KEY.")
+        self.base = url + "/storage/v1"
         self.bucket = bucket
         self._llave = llave
         self.cliente = cliente or httpx.Client(timeout=30, follow_redirects=False)
