@@ -6,6 +6,7 @@ tabla de `app/api/rutas.py`. Los módulos se agregan con /modulo.
 
 import logging
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI, Request, status
 from fastapi.exceptions import RequestValidationError
@@ -14,6 +15,7 @@ from fastapi.responses import JSONResponse
 from slowapi.errors import RateLimitExceeded
 from sqlalchemy.exc import OperationalError
 from starlette.exceptions import HTTPException as ErrorHTTP
+from starlette.staticfiles import StaticFiles
 
 from app.almacen import AlmacenNoDisponible
 from app.api import (
@@ -222,3 +224,48 @@ app.include_router(evaluaciones.router)
 app.include_router(revision.router)
 app.include_router(informe.router)
 app.include_router(config_ia.router)
+
+# Pantallas del frontend (React): todas caen en index.html; React decide qué mostrar.
+# "laboratorios", "admin" y "equipo" quedan reservadas para los PR 2 y 3 (así no hay que tocar el backend).
+PANTALLAS = {
+    "",
+    "clave",
+    "entregas",
+    "publicada",
+    "informe",
+    "mapa",
+    "bandeja",
+    "revision",
+    "laboratorios",
+    "admin",
+    "equipo",
+}
+
+
+class Interfaz(StaticFiles):
+    """Archivos del build de React. Las pantallas conocidas sin archivo caen en index.html
+    (React decide qué mostrar); un archivo que no existe o una pantalla desconocida dan 404."""
+
+    async def get_response(self, path: str, scope):
+        try:
+            return await super().get_response(path, scope)
+        except ErrorHTTP as error:
+            limpio = path.replace("\\", "/").strip("/")
+            limpio = "" if limpio in {"", "."} else limpio
+            primera = limpio.split("/", 1)[0]
+            if error.status_code != 404 or "." in limpio or primera not in PANTALLAS:
+                raise
+            return await super().get_response("index.html", scope)
+
+
+def _servir_interfaz() -> None:
+    """Si existe el build del frontend (frontend/dist, lo arma el Dockerfile), la misma app lo
+    sirve en "/". Así la cookie de sesión funciona sin CORS y no hay un segundo servicio (D-23).
+    Las rutas /api y /salud se registraron antes, así que van primero. Base del frontend:
+    Jerónimo Aristizabal (PR #16)."""
+    carpeta = Path(__file__).resolve().parents[1] / "frontend" / "dist"
+    if carpeta.is_dir():
+        app.mount("/", Interfaz(directory=carpeta), name="interfaz")
+
+
+_servir_interfaz()

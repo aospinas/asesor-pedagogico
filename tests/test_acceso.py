@@ -9,6 +9,8 @@ from uuid import uuid4
 
 import pytest
 from fastapi.routing import APIRoute
+from starlette.routing import Mount
+from starlette.staticfiles import StaticFiles
 
 from app.api.rutas import RUTAS
 from app.esquemas import Rol
@@ -24,6 +26,8 @@ def _rutas(contenedor):
             yield ruta
         elif hasattr(ruta, "original_router"):
             yield from _rutas(ruta.original_router)
+        elif isinstance(ruta, Mount) and ruta.name == "interfaz" and isinstance(ruta.app, StaticFiles):
+            continue  # el build de React (D-23): solo archivos estáticos, sin rutas de la API
         else:  # si FastAPI cambia otra vez, que la prueba falle en vez de saltarse rutas
             raise AssertionError(f"Tipo de ruta desconocido: {type(ruta).__name__}")
 

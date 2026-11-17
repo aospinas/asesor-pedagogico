@@ -430,3 +430,14 @@ El módulo se hizo con **Opus 5.5**: Mythos 5.2 y Fable 5.2 no tenían créditos
 - **Para el frontend:** en el mapa, `fragmento` y `archivo` son texto del estudiante, y `etiqueta`, `que_profundizar` y el plan, texto del docente o de la IA: se muestran como texto, nunca como HTML.
 - **Cambia el contrato:** `Informe` suma `cohortes` y `competencias`; `Costos` suma `planes_*`; `planes_fortalecimiento` suma `costo_usd` (la migración 0007 aún no estaba en main).
 
+
+## D-23: Frontend servido por la misma app (17-nov-2026)
+
+- **Un solo servicio:** el `Dockerfile` construye React en una etapa de Node 22 y copia solo `frontend/dist`; FastAPI lo sirve en `/` con la clase `Interfaz` (`app/main.py`). Las rutas `/api` y `/salud` van primero. Solo las pantallas de `PANTALLAS` caen en `index.html`; un archivo que no existe da 404. Así la cookie de sesión funciona sin CORS.
+- **CSRF:** como el frontend va en el mismo dominio, en Render `ORIGENES_PERMITIDOS` debe tener la URL pública del servicio; si no, todo POST, PUT, PATCH y DELETE se rechaza.
+- **Vite 6.3.5** en vez de Vite 7: el PC tiene Node 20.18 y Vite 7 pide 20.19 o más. El CI y la imagen usan Node 22.
+- **Base de Jerónimo Aristizabal (PR #16):** se reusó su frontend y se adaptó a la API real. El PR no se fusiona porque repetía backend ya fusionado.
+- **Cambia el contrato:** `ResultadoLaboratorio` suma `evaluacion_id` para que el estudiante abra su evaluación publicada desde el informe.
+- **Revisión:** el enlace de la bandeja pasa `?laboratorio=` para cargar la versión de rúbrica evaluada y mostrar también los criterios que la IA no alcanzó a proponer.
+- **Pantallas reservadas** para los PR 2 y 3: `laboratorios`, `admin` y `equipo`.
+- **Seguridad:** todo texto se muestra como texto (React lo escapa y Cytoscape dibuja en canvas); no se usa `dangerouslySetInnerHTML` ni se guardan tokens en el navegador.
