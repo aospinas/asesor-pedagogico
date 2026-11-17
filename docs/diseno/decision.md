@@ -87,7 +87,8 @@ Lo que eso significa en la construcción (no son opcionales):
 
 | Uso | Color | Nota |
 | --- | --- | --- |
-| Verde principal (botones, encabezado, nivel final) | `#0B5D3B` | Aproximado al verde de la Universidad de Manizales: **confirmar con el manual de imagen** antes de construir |
+| Verde principal (botones, encabezado, nivel final) | `#0B5D3B` | Verde de la Universidad de Manizales, confirmado por Andrés el 17 nov 2026 |
+| **Acento glaciar** (lo llamativo) | `#00B4D8` en rellenos, gráficas y sobre el verde · `#00739A` cuando es texto sobre fondo claro | El hielo de la cumbre del Nevado. Ver reglas abajo |
 | Texto | `#15241C` | |
 | Texto secundario | `#44564B` | AA sobre blanco y sobre `#F3F5F1` |
 | Fondo de la app | `#F3F5F1` | Bruma de páramo |
@@ -100,6 +101,31 @@ Lo que eso significa en la construcción (no son opcionales):
 
 Niveles de dominio (mapa e informe): Alto ▲ `#0B5D3B` relleno · Medio ◆
 `#DCEBE3` · Básico ● borde `#0B5D3B` · Por fortalecer ○ borde `#B42318`.
+
+### Acento glaciar
+
+Andrés confirmó el verde de la U y pidió un color más llamativo si lo había. El
+verde se queda como color principal y se suma **un solo acento: azul glaciar**,
+el hielo de la cumbre. Verde y azul glaciar juntos son la montaña con nieve, así
+que el acento tiene sentido en la metáfora y no es un color suelto.
+
+Dónde va (y solo ahí, para que siga llamando la atención):
+
+- La **cumbre**: el casquete de nieve en las curvas de nivel del encabezado y del
+  inicio, y la banda "Alto · 5 321 m" del mapa mental.
+- La **ruta resaltada** del mapa mental cuando se toca un tema.
+- El **escalón elegido** en la revisión docente: un borde o brillo glaciar al
+  cambiar de nivel, mientras la nota se recalcula.
+- La **línea de la nota final** en el altímetro y la serie del estudiante en el
+  perfil de ascenso del informe (la cohorte va en gris punteado).
+- El **anillo de foco** del teclado (`outline` de 3 px `#00739A`).
+
+Dónde **no** va: estados (encontrada, no encontrada, alerta), botones
+principales (siguen verdes) ni fondos grandes. Regla práctica: el glaciar no
+pasa del 10 % de una pantalla.
+
+Contraste comprobado: `#00739A` sobre blanco 5,4:1 (texto AA); `#00B4D8` sobre
+`#0B5D3B` 3,2:1 (solo para formas, íconos y texto de 24 px o más).
 
 ## Tipografía
 
@@ -119,8 +145,7 @@ con la skill `frontend-design`.
 
 ## Pendientes
 
-1. Confirmar el verde oficial de la Universidad de Manizales antes de construir.
-2. **Al final del proyecto:** la página del equipo (pantalla 5). El equipo son
+1. **Al final del proyecto:** la página del equipo (pantalla 5). El equipo son
    **3 personas**, no 2 como dicen los bocetos: Andrés Ospina Silva, Santiago
    Arias Aguirre y Jerónimo Aristizabal. Faltan la foto de cada uno (retrato real,
    no de stock) y su rol. Mientras
