@@ -16,6 +16,7 @@ import json
 import logging
 import os
 import re
+import secrets
 import sys
 import threading
 import time
@@ -38,7 +39,9 @@ COMANDO_PRUEBAS = "pytest -q -p no:cacheprovider"
 RECORTADA = "\n... (salida recortada)"
 # Controles que no son salto de línea ni tabulación (incluye ESC de los colores de terminal,
 # los C1 y los que invierten el sentido del texto).
-CONTROLES = re.compile(r"[\x00-\x08\x0b-\x1f\x7f-\x9f\u200e\u200f\u202a-\u202e\u2066-\u2069]")
+CONTROLES = re.compile(
+    r"[\x00-\x08\x0b-\x1f\x7f-\x9f\u061c\u200e\u200f\u2028\u2029\u202a-\u202e\u2066-\u2069]"
+)
 
 OCUPADO = "El sandbox está ocupado con otra entrega. Vuelve a lanzar la evaluación en unos minutos."
 SIN_TIEMPO = "Se acabó el tiempo del sandbox antes de llegar a este paso."
@@ -166,27 +169,32 @@ def verificar(archivos: list[ArchivoCodigo], config: ConfigSandbox | None = None
         _TURNO.release()
 
 
-def _correr(tarea: str, lista: list[dict], config: ConfigSandbox, limite: float) -> Corrida | None:
+def _correr(
+    tarea: str, lista: list[dict], config: ConfigSandbox, limite: float, marca: str = ""
+) -> Corrida | None:
     restante = limite - time.monotonic()
     if restante <= 0:
         return None
     if config.modo == "docker":
-        return ejecutar.correr_docker(tarea, lista, restante, config.imagen, config.memoria_mb)
-    return ejecutar.correr_proceso(tarea, lista, restante, config.memoria_mb)
+        return ejecutar.correr_docker(tarea, lista, restante, config.imagen, config.memoria_mb, marca=marca)
+    return ejecutar.correr_proceso(tarea, lista, restante, config.memoria_mb, marca=marca)
 
 
-def _leer_revision(texto: str) -> _Revision | None:
-    for linea in reversed(texto.splitlines()):
-        if linea.startswith(MARCA):
+def _leer_revision(texto: str, marca: str) -> _Revision | None:
+    """La línea del resultado: la que empieza con la marca de ESTA corrida. Se corta solo
+    en "\n" (splitlines también corta en U+2028 y otros, que la entrega puede meter)."""
+    for linea in reversed(texto.split("\n")):
+        if linea.startswith(marca):
             try:
-                return _Revision.model_validate(json.loads(linea[len(MARCA) :]))
+                return _Revision.model_validate(json.loads(linea[len(marca) :]))
             except (ValueError, ValidationError):  # JSON roto o con tipos que no son
                 return None
     return None
 
 
 def _revisar(lista: list[dict], config: ConfigSandbox, limite: float) -> list[VerificacionCodigo]:
-    corrida = _correr("revisar", lista, config, limite)
+    codigo = secrets.token_hex(16)
+    corrida = _correr("revisar", lista, config, limite, codigo)
     if corrida is None:
         return [_aviso(TipoVerificacion.SINTAXIS, "ast.parse y ruff", SIN_TIEMPO, agotado=True)]
     if corrida.tiempo_agotado:
@@ -200,7 +208,8 @@ def _revisar(lista: list[dict], config: ConfigSandbox, limite: float) -> list[Ve
             )
         ]
     texto = corrida.salida.decode("utf-8", errors="replace")
-    revision = _leer_revision(texto)
+    # Salida recortada: la línea del resultado pudo quedar afuera; no se adivina.
+    revision = None if corrida.recortada else _leer_revision(texto, MARCA + codigo)
     if revision is None:
         return [
             VerificacionCodigo(

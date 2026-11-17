@@ -24,6 +24,8 @@ import uuid
 from dataclasses import dataclass
 from pathlib import Path
 
+from app.config import ajustes
+
 LANZADOR = Path(__file__).with_name("lanzador.py")
 MAXIMO_LEIDO = 256 * 1024  # bytes de salida que se guardan en memoria; el resto se descarta
 ESPERA_CIERRE_SEG = 5
@@ -123,7 +125,7 @@ def _correr(comando: list[str], entrada: bytes, tiempo_seg: float, al_vencer, **
     )
 
 
-def _datos(tarea: str, archivos: list[dict], carpeta: str | None, memoria_mb: int) -> bytes:
+def _datos(tarea: str, archivos: list[dict], carpeta: str | None, memoria_mb: int, marca: str = "") -> bytes:
     limites = {
         "cpu_seg": CPU_SEG,
         "memoria_bytes": memoria_mb * 1024 * 1024,
@@ -131,7 +133,7 @@ def _datos(tarea: str, archivos: list[dict], carpeta: str | None, memoria_mb: in
         # ruff usa hilos y no ejecuta el código: el tope de procesos va solo en las pruebas
         "procesos": PROCESOS if tarea == "pruebas" else None,
     }
-    datos = {"tarea": tarea, "carpeta": carpeta, "archivos": archivos, "limites": limites}
+    datos = {"tarea": tarea, "carpeta": carpeta, "archivos": archivos, "limites": limites, "marca": marca}
     return json.dumps(datos, ensure_ascii=False).encode("utf-8")
 
 
@@ -220,7 +222,7 @@ def revisar_docker(imagen: str, tiempo_seg: float = 20) -> None:
 
 
 def correr_docker(
-    tarea: str, archivos: list[dict], tiempo_seg: float, imagen: str, memoria_mb: int
+    tarea: str, archivos: list[dict], tiempo_seg: float, imagen: str, memoria_mb: int, marca: str = ""
 ) -> Corrida:
     nombre = f"asesor-sandbox-{uuid.uuid4().hex}"
     entorno = _entorno_docker()
@@ -236,7 +238,7 @@ def correr_docker(
             )
 
     comando = comando_docker(nombre, imagen, memoria_mb, _lanzador(), tiempo_seg)
-    return _correr(comando, _datos(tarea, archivos, None, memoria_mb), tiempo_seg, matar, env=entorno)
+    return _correr(comando, _datos(tarea, archivos, None, memoria_mb, marca), tiempo_seg, matar, env=entorno)
 
 
 # ---------- Modo proceso ----------
@@ -265,7 +267,13 @@ def entorno_proceso(carpeta: str) -> dict[str, str]:
     }
 
 
-def correr_proceso(tarea: str, archivos: list[dict], tiempo_seg: float, memoria_mb: int) -> Corrida:
+def correr_proceso(
+    tarea: str, archivos: list[dict], tiempo_seg: float, memoria_mb: int, marca: str = ""
+) -> Corrida:
+    # Otra capa además del validador de app/config.py: aunque alguien arme la configuración
+    # a mano, en producción el modo proceso nunca ejecuta el código del estudiante (D-18).
+    if tarea == "pruebas" and ajustes().en_produccion:
+        raise SandboxNoDisponible("En este servidor no se ejecutan las pruebas del estudiante.")
     if not sys.platform.startswith("linux"):
         raise SandboxNoDisponible("El modo proceso solo funciona en Linux. En el PC usa SANDBOX_MODE=docker.")
     proteger_proceso_web()
@@ -278,7 +286,7 @@ def correr_proceso(tarea: str, archivos: list[dict], tiempo_seg: float, memoria_
     try:
         return _correr(
             [sys.executable, "-I", "-B", "-c", _lanzador()],
-            _datos(tarea, archivos, carpeta, memoria_mb),
+            _datos(tarea, archivos, carpeta, memoria_mb, marca),
             tiempo_seg,
             matar,
             env=entorno_proceso(carpeta),

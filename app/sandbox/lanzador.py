@@ -29,7 +29,10 @@ import sys
 import tempfile
 import time
 
+# El resultado de "revisar" va en una línea que empieza con esta marca más un código al
+# azar que manda la app en cada corrida (la entrega no lo conoce ni lo puede imitar).
 MARCA = "@@RESULTADO_SANDBOX@@"
+CODIFICACIONES_PERMITIDAS = frozenset({"utf-8", "utf8", "utf_8", "ascii", "us-ascii"})
 EXTENSIONES_NATIVAS = (".so", ".pyd", ".dll", ".dylib")
 MAXIMO_LINEAS = 60  # hallazgos que se listan por verificación; el resto se cuenta
 RUFF_ESTILO = ("E", "F", "B")
@@ -98,7 +101,12 @@ EVENTOS_DE_ARCHIVO = frozenset(
 ESCRITURA = os.O_WRONLY | os.O_RDWR | os.O_CREAT | os.O_APPEND | os.O_TRUNC
 ESCRITURA_PERMITIDA = frozenset({"/dev/null"})  # pytest abre su registro ahí
 # Funciones sin evento de auditoría que dejan señalar a otro proceso (pidfd)
-SIN_AUDITORIA = (("os", "pidfd_open"), ("posix", "pidfd_open"), ("signal", "pidfd_send_signal"))
+SIN_AUDITORIA = (
+    ("os", "pidfd_open"),
+    ("posix", "pidfd_open"),
+    ("signal", "pidfd_send_signal"),
+    ("_signal", "pidfd_send_signal"),
+)
 
 
 def ruta_valida(ruta: str) -> bool:
@@ -161,12 +169,30 @@ def _rel(ruta: str, carpeta: str) -> str:
     return relativa.replace(os.sep, "/")
 
 
+def codificacion_declarada(texto: str) -> str | None:
+    """La codificación que declara el archivo en sus 2 primeras líneas (PEP 263), en minúsculas.
+
+    Con `# -*- coding: utf-7 -*-`, ast y ruff (que leen utf-8) ven un comentario y Python
+    ejecuta código escondido en él: por eso solo se acepta utf-8."""
+    import re
+
+    for linea in texto.split("\n")[:2]:
+        encontrada = re.match(r"^[ \t\f]*#.*?coding[:=][ \t]*([-\w.]+)", linea)
+        if encontrada:
+            return encontrada.group(1).lower()
+    return None
+
+
 def revisar_sintaxis(carpeta: str, rutas_py: list[str]) -> dict:
     inicio = time.monotonic()
     errores = []
     for ruta in rutas_py:
         with open(os.path.join(carpeta, *ruta.split("/")), encoding="utf-8") as fuente:
             texto = fuente.read()
+        declarada = codificacion_declarada(texto)
+        if declarada is not None and declarada not in CODIFICACIONES_PERMITIDAS:
+            errores.append(f"{ruta}:1: declara la codificación {declarada!r}; solo se acepta utf-8")
+            continue
         try:
             ast.parse(texto, filename=ruta)
         except SyntaxError as error:
@@ -300,29 +326,80 @@ def revisar(carpeta: str, archivos: list[dict]) -> dict:
 def crear_gancho(carpeta: str, raices_permitidas: tuple[str, ...] = ()):
     """Gancho de auditoría para cuando corre el código del estudiante.
 
-    Todo lo que usa queda guardado en el cierre al crearlo: si el estudiante cambia las
-    listas de este módulo (`import __main__`) o funciones de `os`, el gancho no se entera.
-    `raices_permitidas`: carpetas de donde sí se pueden cargar extensiones nativas (las de
-    Python instalado); cualquier otra se rechaza.
+    No es un cierre: en Python 3.13+ (PEP 667) el estudiante puede llegar al frame del gancho
+    por un traceback y reescribir las variables de un cierre. Aquí todo lo que usa va en una
+    tupla (que no se puede cambiar) atada con functools.partial a una función de módulo, y
+    se desempaca en cada llamada: reescribir el frame de una llamada que ya terminó no cambia
+    la siguiente. Las funciones del sistema (isinstance, realpath...) también van en la tupla,
+    así cambiar `builtins` o `__main__` no lo engaña. Cambiar el código interno de esas
+    funciones sí (no es una barrera, D-18).
     """
-    realpath, normpath, fsdecode, fspath = os.path.realpath, posixpath.normpath, os.fsdecode, os.fspath
-    separador = os.sep
-    carpeta = realpath(carpeta)
-    propio = str(os.getpid())
-    bloqueados, prefijos = frozenset(EVENTOS_BLOQUEADOS), tuple(PREFIJOS_BLOQUEADOS)
-    de_archivo, nativas = frozenset(EVENTOS_DE_ARCHIVO), tuple(EXTENSIONES_NATIVAS)
-    permitidas, escritura = frozenset(ESCRITURA_PERMITIDA), ESCRITURA
-    raices = tuple(realpath(r) + separador for r in raices_permitidas)
-    rechazo = PermissionError
+    import functools
+    import pathlib
 
-    def texto_de(ruta) -> str | None:
-        try:
-            return fsdecode(fspath(ruta))
-        except TypeError:
+    realpath = os.path.realpath
+    datos = (
+        realpath(carpeta),
+        os.sep,
+        str(os.getpid()),
+        frozenset(EVENTOS_BLOQUEADOS),
+        tuple(PREFIJOS_BLOQUEADOS),
+        frozenset(EVENTOS_DE_ARCHIVO),
+        tuple(EXTENSIONES_NATIVAS),
+        frozenset(ESCRITURA_PERMITIDA),
+        ESCRITURA,
+        tuple(realpath(r) + os.sep for r in raices_permitidas),
+        # Tipos de ruta que se aceptan tal cual: sin __fspath__ del estudiante, que podría
+        # devolver una ruta al revisar y otra al abrir.
+        (str, bytes, pathlib.PurePosixPath, pathlib.PosixPath, pathlib.PureWindowsPath, pathlib.WindowsPath),
+        realpath,
+        posixpath.normpath,
+        os.fsdecode,
+        os.fspath,
+        isinstance,
+        type,
+        any,
+        len,
+        PermissionError,
+    )
+    return functools.partial(_evaluar_evento, datos=datos)
+
+
+def _evaluar_evento(evento: str, args: tuple, *, datos: tuple) -> None:
+    """El gancho. Solo usa lo que trae `datos` (ver crear_gancho)."""
+    (
+        carpeta,
+        separador,
+        propio,
+        bloqueados,
+        prefijos,
+        de_archivo,
+        nativas,
+        permitidas,
+        escritura,
+        raices,
+        tipos_ruta,
+        realpath,
+        normpath,
+        fsdecode,
+        fspath,
+        es_tipo,
+        tipo_de,
+        alguno,
+        largo,
+        rechazo,
+    ) = datos
+
+    if evento in bloqueados or evento.startswith(prefijos):
+        raise rechazo(f"El sandbox no permite '{evento}'.")
+
+    def texto_de(ruta):
+        # Solo los tipos exactos; cualquier otro objeto cuenta como "afuera".
+        if tipo_de(ruta) not in tipos_ruta:
             return None
+        return fsdecode(fspath(ruta))
 
     def adentro(ruta) -> bool:
-        """La ruta (relativa a la carpeta de trabajo real) queda dentro de la carpeta."""
         texto = texto_de(ruta)
         if texto is None:
             return False
@@ -333,52 +410,46 @@ def crear_gancho(carpeta: str, raices_permitidas: tuple[str, ...] = ()):
         texto = texto_de(ruta)
         return texto is not None and texto.lower().endswith(nativas)
 
-    def otro_proceso(texto: str) -> bool:
-        """/proc de otro proceso, también escrito como //proc, /proc/self/../N o con enlaces."""
+    if evento == "open":
+        ruta, modo, banderas = (args + (None, None, None))[:3]  # args ya es tupla (sin builtins)
+        if es_tipo(ruta, int) and tipo_de(ruta) is not bool:  # descriptor que ya estaba abierto
+            return
+        texto = texto_de(ruta)
+        if texto is None:
+            raise rechazo("El sandbox solo acepta rutas de texto.")
+        # /proc de otro proceso, también escrito como //proc, /proc/self/../N o con enlaces
         for forma in ("/" + normpath(texto.replace("\\", "/")).lstrip("/"), realpath(texto)):
             partes = forma.replace("\\", "/").split("/")
-            if len(partes) > 2 and partes[1] == "proc" and partes[2].isdigit() and partes[2] != propio:
-                return True
-        return False
-
-    def gancho(evento: str, args: tuple) -> None:
-        if evento in bloqueados or evento.startswith(prefijos):
-            raise rechazo(f"El sandbox no permite '{evento}'.")
-        if evento == "open":
-            ruta, modo, banderas = (tuple(args) + (None, None, None))[:3]
-            if isinstance(ruta, int):  # descriptor que ya estaba abierto
-                return
-            texto = texto_de(ruta) or ""
-            if otro_proceso(texto):
+            if largo(partes) > 2 and partes[1] == "proc" and partes[2].isdigit() and partes[2] != propio:
                 raise rechazo("El sandbox no permite leer otros procesos.")
-            escribe = (isinstance(modo, str) and any(c in modo for c in "wax+")) or (
-                isinstance(banderas, int) and banderas & escritura
-            )
-            if escribe and texto not in permitidas and (not adentro(ruta) or nativa(ruta)):
-                raise rechazo("El sandbox solo permite escribir en su carpeta.")
-        elif evento in de_archivo:
-            caminos = [a for a in args[:2] if isinstance(a, (str, bytes, os.PathLike))]
-            if any(not adentro(c) or nativa(c) for c in caminos):
-                raise rechazo("El sandbox solo permite cambiar archivos de su carpeta.")
-        elif evento == "os.chdir":
-            # Sin esto, las rutas relativas se saldrían de la carpeta. fchdir llega con un número.
-            if not args or isinstance(args[0], int) or not adentro(args[0]):
-                raise rechazo("El sandbox no permite salir de su carpeta.")
-        elif evento == "sqlite3.connect":
-            base = texto_de(args[0]) if args else None
-            if base not in {":memory:", ""} and (
-                base is None or base.startswith("file:") or not adentro(base)
-            ):
-                raise rechazo("El sandbox solo permite bases SQLite en su carpeta o en memoria.")
-        elif evento == "import":
-            # CPython solo pone el archivo en este evento al cargar una extensión nativa (los .py
-            # llegan con None). Se acepta solo si está en Python instalado: así no pasa una .so de
-            # la entrega ni una cargada desde /proc/self/fd con memfd, tenga el nombre que tenga.
-            archivo = texto_de(args[1]) if len(args) > 1 and args[1] is not None else None
-            if archivo and not realpath(archivo).startswith(raices):
+        escribe = (es_tipo(modo, str) and alguno(c in modo for c in "wax+")) or (
+            es_tipo(banderas, int) and banderas & escritura
+        )
+        if escribe and texto not in permitidas and (not adentro(ruta) or nativa(ruta)):
+            raise rechazo("El sandbox solo permite escribir en su carpeta.")
+    elif evento in de_archivo:
+        # Los argumentos que son rutas. Números, None y tuplas (por ejemplo los tiempos de
+        # os.utime) no lo son; cualquier otro objeto se toma como ruta y, si no es de un tipo
+        # aceptado, cuenta como "afuera".
+        caminos = [a for a in args[:2] if not es_tipo(a, (int, float, tuple, list, type(None)))]
+        if alguno(not adentro(c) or nativa(c) for c in caminos):
+            raise rechazo("El sandbox solo permite cambiar archivos de su carpeta.")
+    elif evento == "os.chdir":
+        # Sin esto, las rutas relativas se saldrían de la carpeta. fchdir llega con un número.
+        if not args or es_tipo(args[0], int) or not adentro(args[0]):
+            raise rechazo("El sandbox no permite salir de su carpeta.")
+    elif evento.startswith("sqlite3."):
+        # SQLite escribe con ATTACH o VACUUM INTO sin pasar por el gancho: no se usa en las pruebas.
+        raise rechazo("El sandbox no permite SQLite en las pruebas.")
+    elif evento == "import":
+        # CPython solo pone el archivo en este evento al cargar una extensión nativa (los .py
+        # llegan con None). Se acepta solo si está en Python instalado: así no pasa una .so de
+        # la entrega ni una cargada desde /proc/self/fd con memfd, tenga el nombre que tenga.
+        archivo = args[1] if largo(args) > 1 else None
+        if archivo is not None:
+            texto = texto_de(archivo)
+            if texto is None or not realpath(texto).startswith(raices):
                 raise rechazo("El sandbox no permite cargar librerías nativas de la entrega.")
-
-    return gancho
 
 
 def quitar_funciones_sin_auditoria(objetivos: tuple[tuple[str, str], ...] = SIN_AUDITORIA) -> None:
@@ -429,8 +500,13 @@ def main() -> int:
     if sys.platform.startswith("linux"):
         poner_limites(datos.get("limites") or {})
     if datos["tarea"] == "revisar":
+        import warnings
+
+        # ast.parse avisa (SyntaxWarning) repitiendo líneas del estudiante: nada de eso sale.
+        warnings.simplefilter("ignore")
         resultado = revisar(carpeta, datos["archivos"])
-        sys.stdout.write(MARCA + json.dumps(resultado, ensure_ascii=False) + "\n")
+        marca = MARCA + str(datos.get("marca", ""))
+        sys.stdout.write(marca + json.dumps(resultado, ensure_ascii=True) + "\n")
         sys.stdout.flush()
         return 0
     if datos["tarea"] == "pruebas":

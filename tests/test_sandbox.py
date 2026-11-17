@@ -125,10 +125,11 @@ def test_sandbox_ocupado_avisa(monkeypatch):
     assert aviso.salida == sandbox.OCUPADO
 
 
-def _revision_falsa(*_args, **_kwargs):
+def _revision_falsa(*_args, marca: str = "", **_kwargs):
+    """Lo que imprime el lanzador en "revisar": la marca de la corrida y el JSON."""
     paso = {"comando": "c", "codigo_salida": 0, "salida": "ok", "duracion_ms": 1}
     datos = {"sintaxis": paso, "estilo": paso, "seguridad": paso}
-    texto = ("ruido\n" + lanzador.MARCA + __import__("json").dumps(datos) + "\n").encode()
+    texto = ("ruido\n" + lanzador.MARCA + marca + __import__("json").dumps(datos) + "\n").encode()
     return Corrida(codigo_salida=0, salida=texto, recortada=False, duracion_ms=5, tiempo_agotado=False)
 
 
@@ -136,9 +137,9 @@ def test_pruebas_apagadas_no_se_ejecutan(monkeypatch):
     """En Render (SANDBOX_PRUEBAS=false) solo se revisa sin ejecutar y se avisa por qué."""
     llamadas = []
 
-    def correr(tarea, *args):
+    def correr(tarea, *args, **kwargs):
         llamadas.append(tarea)
-        return _revision_falsa()
+        return _revision_falsa(**kwargs)
 
     monkeypatch.setattr(ejecutar, "revisar_docker", lambda _imagen: None)
     monkeypatch.setattr(ejecutar, "correr_docker", correr)
@@ -158,7 +159,7 @@ def test_sin_archivos_de_prueba_no_corre_pytest(monkeypatch):
     llamadas = []
     monkeypatch.setattr(ejecutar, "revisar_docker", lambda _imagen: None)
     monkeypatch.setattr(
-        ejecutar, "correr_docker", lambda tarea, *a: llamadas.append(tarea) or _revision_falsa()
+        ejecutar, "correr_docker", lambda tarea, *a, **k: llamadas.append(tarea) or _revision_falsa(**k)
     )
     verificaciones = verificar(_archivos(**{"main.py": "x = 1\n"}), _config("docker"))
     assert llamadas == ["revisar"]
@@ -171,7 +172,7 @@ def test_salida_sin_marca_queda_como_fallo(monkeypatch):
     monkeypatch.setattr(
         ejecutar,
         "correr_docker",
-        lambda *a: Corrida(
+        lambda *a, **k: Corrida(
             codigo_salida=137, salida=b"Killed", recortada=False, duracion_ms=3, tiempo_agotado=False
         ),
     )
@@ -495,16 +496,18 @@ def test_sin_gc_ni_pidfd():
         gc.get_referrers(os)
     assert not hasattr(os, "pidfd_open")
     assert not hasattr(signal, "pidfd_send_signal")
+    import _signal
+
+    assert not hasattr(_signal, "pidfd_send_signal")
 
 
-def test_sqlite_solo_en_memoria_o_en_su_carpeta(tmp_path):
+def test_sin_sqlite(tmp_path):
+    # Con ATTACH o VACUUM INTO, SQLite escribe donde quiera sin pasar por el gancho
     import sqlite3
 
-    sqlite3.connect(":memory:").close()
-    sqlite3.connect(tmp_path / "ok.db").close()
-    for base in ("/tmp/fuera.db", "file:/tmp/fuera.db?mode=rwc"):
+    for base in (":memory:", str(tmp_path / "x.db"), "/tmp/fuera.db"):
         with pytest.raises(OSError):
-            sqlite3.connect(base, uri=True)
+            sqlite3.connect(base)
 
 
 def test_no_sale_de_su_carpeta_con_chdir(tmp_path):
@@ -513,6 +516,44 @@ def test_no_sale_de_su_carpeta_con_chdir(tmp_path):
         os.chdir("/")
     with pytest.raises(OSError):
         os.chdir("/tmp")
+
+
+def test_reescribir_el_frame_del_gancho_no_sirve():
+    # En 3.13+ f_locals escribe en las variables del frame (y en las de un cierre)
+    try:
+        open("/tmp/fuera-frame.txt", "w")
+    except PermissionError as error:
+        rastro = error.__traceback__
+        while rastro is not None:
+            variables = rastro.tb_frame.f_locals
+            for nombre in ("bloqueados", "prefijos", "carpeta", "adentro", "datos", "escritura"):
+                if nombre in variables:
+                    try:
+                        variables[nombre] = frozenset() if nombre == "bloqueados" else ("zzz",)
+                    except Exception:
+                        pass
+            rastro = rastro.tb_next
+    with pytest.raises(OSError):
+        subprocess.run(["true"], check=False)
+    with pytest.raises(OSError):
+        open("/tmp/fuera-frame.txt", "w").close()
+
+
+def test_ruta_que_cambia_al_abrirla():
+    class Tramposa:
+        veces = 0
+
+        def __fspath__(self):
+            Tramposa.veces += 1
+            return "adentro.txt" if Tramposa.veces == 1 else "/tmp/fuera-tramposa.txt"
+
+    # open() convierte la ruta una sola vez y abre esa misma: o se rechaza, o queda adentro.
+    # Lo que importa es que nunca aparezca el archivo de afuera.
+    try:
+        open(Tramposa(), "w").close()
+    except OSError:
+        pass
+    assert not os.path.exists("/tmp/fuera-tramposa.txt")
 
 
 def test_no_carga_librerias_nativas_propias():
@@ -554,9 +595,11 @@ NOMBRES_HOSTILES = (
     "test_proc_disfrazado",
     "test_cambiar_las_listas_del_gancho_no_sirve",
     "test_sin_gc_ni_pidfd",
-    "test_sqlite_solo_en_memoria_o_en_su_carpeta",
+    "test_sin_sqlite",
     "test_no_sale_de_su_carpeta_con_chdir",
     "test_no_carga_librerias_nativas_propias",
+    "test_reescribir_el_frame_del_gancho_no_sirve",
+    "test_ruta_que_cambia_al_abrirla",
 )
 
 
@@ -877,16 +920,20 @@ def _corrida(texto: str, **cambios) -> Corrida:
 )
 def test_resultado_raro_del_lanzador_es_falla_y_no_error(monkeypatch, paso):
     datos = {"sintaxis": paso, "estilo": paso, "seguridad": paso}
-    texto = lanzador.MARCA + __import__("json").dumps(datos)
+    texto = "@@MARCA@@" + __import__("json").dumps(datos)
     monkeypatch.setattr(ejecutar, "revisar_docker", lambda _imagen: None)
-    monkeypatch.setattr(ejecutar, "correr_docker", lambda *a: _corrida(texto))
+    monkeypatch.setattr(
+        ejecutar,
+        "correr_docker",
+        lambda *a, **k: _corrida(texto.replace("@@MARCA@@", lanzador.MARCA + k["marca"])),
+    )
     (fallo,) = verificar(_archivos(**{"main.py": "x = 1\n"}), _config("docker"))
     assert fallo.salida.startswith(sandbox.FALLO)
 
 
 @pytest.mark.parametrize("error", [OSError("docker desapareció"), FileNotFoundError(), RuntimeError("x")])
 def test_error_al_lanzar_no_tumba_la_evaluacion(monkeypatch, error):
-    def falla(*_a):
+    def falla(*_a, **_k):
         raise error
 
     monkeypatch.setattr(ejecutar, "revisar_docker", lambda _imagen: None)
@@ -900,7 +947,7 @@ def test_error_al_lanzar_no_tumba_la_evaluacion(monkeypatch, error):
 def test_revisar_con_tiempo_agotado(monkeypatch):
     monkeypatch.setattr(ejecutar, "revisar_docker", lambda _imagen: None)
     monkeypatch.setattr(
-        ejecutar, "correr_docker", lambda *a: _corrida("", codigo_salida=None, tiempo_agotado=True)
+        ejecutar, "correr_docker", lambda *a, **k: _corrida("", codigo_salida=None, tiempo_agotado=True)
     )
     (aviso,) = verificar(_archivos(**{"main.py": "x = 1\n"}), _config("docker"))
     assert aviso.tiempo_agotado
@@ -911,10 +958,10 @@ def test_pruebas_sin_tiempo_restante(monkeypatch):
     """Si "revisar" se gastó todo el tiempo, pytest ni arranca y se dice por qué."""
     llamadas = []
 
-    def revisar_lento(tarea, *a):
+    def revisar_lento(tarea, *a, **k):
         llamadas.append(tarea)
         time.sleep(1.1)
-        return _revision_falsa()
+        return _revision_falsa(**k)
 
     monkeypatch.setattr(ejecutar, "revisar_docker", lambda _imagen: None)
     monkeypatch.setattr(ejecutar, "correr_docker", revisar_lento)
@@ -965,10 +1012,8 @@ class TestGanchoEndurecido:
         with pytest.raises(PermissionError):
             gancho("open", ("../afuera.txt", "w", None))
 
-    def test_sqlite(self, gancho, tmp_path):
-        gancho("sqlite3.connect", (":memory:",))
-        gancho("sqlite3.connect", (str(tmp_path / "ok.db"),))
-        for base in (str(tmp_path.parent / "fuera.db"), "file:x.db?mode=rwc", None):
+    def test_sin_sqlite(self, gancho, tmp_path):
+        for base in (":memory:", str(tmp_path / "ok.db"), str(tmp_path.parent / "fuera.db")):
             with pytest.raises(PermissionError):
                 gancho("sqlite3.connect", (base,))
         for evento in ("sqlite3.enable_load_extension", "sqlite3.load_extension"):
@@ -1007,6 +1052,7 @@ def test_quita_funciones_sin_auditoria(monkeypatch):
         ("os", "pidfd_open"),
         ("posix", "pidfd_open"),
         ("signal", "pidfd_send_signal"),
+        ("_signal", "pidfd_send_signal"),
     )
 
 
@@ -1069,3 +1115,151 @@ def test_error_de_ajustes_no_muestra_los_secretos():
         Ajustes(**_produccion(sandbox_pruebas=True, llm_api_key=llave, jwt_secreto=llave))
     assert llave not in str(error.value)
     assert "SANDBOX_PRUEBAS" in str(error.value)
+
+
+# ---------- Arreglos de la re-revisión ----------
+
+
+def _salida_falsa(marca_real: str) -> str:
+    paso = {"comando": "c", "codigo_salida": 0, "salida": "falso", "duracion_ms": 1}
+    falso = __import__("json").dumps({"sintaxis": paso, "estilo": paso, "seguridad": paso})
+    return falso
+
+
+def test_resultado_solo_con_la_marca_de_la_corrida():
+    """Una línea con la marca fija (o con otra marca) no sirve: la entrega no conoce el código."""
+    falso = _salida_falsa("")
+    texto = lanzador.MARCA + falso + "\n" + lanzador.MARCA + "otra" + falso
+    assert sandbox._leer_revision(texto, lanzador.MARCA + "abc123") is None
+    assert sandbox._leer_revision(lanzador.MARCA + "abc123" + falso, lanzador.MARCA + "abc123") is not None
+
+
+def test_separadores_raros_no_parten_la_linea():
+    """splitlines() corta en U+2028, U+0085 y otros: la marca escondida tras uno no cuenta."""
+    marca = lanzador.MARCA + "abc123"
+    for separador in ("\u2028", "\u2029", "\x85", "\x0c", "\x1c", "\r"):
+        texto = "x = 1  # " + separador + marca + _salida_falsa("")
+        assert sandbox._leer_revision(texto, marca) is None
+
+
+def test_salida_recortada_de_revisar_es_falla(monkeypatch):
+    monkeypatch.setattr(ejecutar, "revisar_docker", lambda _imagen: None)
+
+    def recortada(*a, **k):
+        corrida = _revision_falsa(**k)
+        return Corrida(corrida.codigo_salida, corrida.salida, True, corrida.duracion_ms, False)
+
+    monkeypatch.setattr(ejecutar, "correr_docker", recortada)
+    (fallo,) = verificar(_archivos(**{"main.py": "x = 1\n"}), _config("docker"))
+    assert fallo.salida.startswith(sandbox.FALLO)
+
+
+def test_cada_corrida_tiene_su_propia_marca(monkeypatch):
+    marcas = []
+    monkeypatch.setattr(ejecutar, "revisar_docker", lambda _imagen: None)
+    monkeypatch.setattr(
+        ejecutar, "correr_docker", lambda *a, **k: marcas.append(k["marca"]) or _revision_falsa(**k)
+    )
+    for _ in range(2):
+        verificar(_archivos(**{"main.py": "x = 1\n"}), _config("docker"))
+    assert len(set(marcas)) == 2
+    assert all(len(m) == 32 for m in marcas)
+
+
+@sin_modos
+@pytest.mark.parametrize("modo", MODOS)
+def test_la_entrega_no_puede_falsificar_la_revision(modo):
+    """El ataque de la re-revisión: un aviso de ast.parse repite la línea del estudiante, que
+    trae U+2028 + la marca + un resultado falso, y el relleno empuja el resultado real fuera
+    del tope de lectura. Debe salir el resultado verdadero (o una falla), nunca el falso."""
+    paso = {"comando": "c", "codigo_salida": 0, "salida": "Sin hallazgos.", "duracion_ms": 1}
+    falso = __import__("json").dumps({"sintaxis": paso, "estilo": paso, "seguridad": paso})
+    relleno = "".join(f'y{i} = "\\d"  # {"A" * 60000}\n' for i in range(6))
+    archivos = _archivos(
+        **{
+            "a.py": f'x = "\\d"  # \u2028{lanzador.MARCA}{falso}\n' + relleno,
+            "b.py": "import os\n\nos.system(input())\nx = eval(input())\nclave = 'secreta123'\n",
+        }
+    )
+    verificaciones = verificar(archivos, _config(modo))
+    seguridad = verificaciones[-1]
+    assert "S605" in seguridad.salida or seguridad.salida.startswith(sandbox.FALLO), seguridad.salida
+    assert seguridad.salida != "Sin hallazgos."
+
+
+@pytest.mark.parametrize(
+    ("texto", "esperada"),
+    [
+        ("# -*- coding: utf-7 -*-\nx = 1\n", "utf-7"),
+        ("#!/usr/bin/env python\n# vim: set fileencoding=latin-1 :\n", "latin-1"),
+        ("# coding=UTF-8\n", "utf-8"),
+        ("x = 1\n# coding: utf-7\n", "utf-7"),
+        ("x = 1\ny = 2\n# coding: utf-7\n", None),  # solo cuentan las 2 primeras líneas
+        ("x = 1\n", None),
+    ],
+)
+def test_codificacion_declarada(texto, esperada):
+    assert lanzador.codificacion_declarada(texto) == esperada
+
+
+def test_codificacion_utf7_es_error_de_sintaxis(tmp_path):
+    """Con utf-7, ast y ruff ven un comentario y Python ejecuta código escondido en él."""
+    escondido = "# -*- coding: utf-7 -*-\nx = 1 #+AAo-eval(input())\n"
+    lanzador.escribir_archivos(str(tmp_path), [{"ruta": "a.py", "texto": escondido}])
+    resultado = lanzador.revisar_sintaxis(str(tmp_path), ["a.py"])
+    assert resultado["codigo_salida"] == 1
+    assert "utf-7" in resultado["salida"]
+
+
+def test_produccion_nunca_corre_pruebas_en_modo_proceso(monkeypatch):
+    """Aunque alguien arme la configuración a mano (sin pasar por el validador)."""
+    from app import config
+
+    produccion = Ajustes(**_produccion())
+    monkeypatch.setattr(ejecutar, "ajustes", lambda: produccion)
+    with pytest.raises(SandboxNoDisponible, match="no se ejecutan las pruebas"):
+        ejecutar.correr_proceso("pruebas", [], 5, 256)
+    assert config  # el módulo de ajustes de verdad no se tocó
+
+
+def test_lista_de_secretos_cubre_todos_los_ajustes_secretos():
+    """Un secreto nuevo en Ajustes sin agregarlo aquí lo heredarían los procesos hijos."""
+    from pydantic import SecretStr
+
+    secretos = {n.upper() for n, c in Ajustes.model_fields.items() if c.annotation is SecretStr}
+    secretos |= {"DATABASE_URL", "JWT_SECRETO"}
+    assert secretos <= SECRETOS_DEL_ENTORNO
+
+
+def test_limpiar_salida_quita_separadores_unicode():
+    assert limpiar_salida("a\u2028b\u2029c\u061cd") == "abcd"
+
+
+class TestGanchoSinCierre:
+    @pytest.fixture
+    def gancho(self, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        return lanzador.crear_gancho(str(tmp_path))
+
+    def test_no_es_un_cierre(self, gancho):
+        """En 3.13+ las variables de un cierre se pueden reescribir desde un traceback."""
+        funcion = gancho.func
+        assert funcion.__closure__ is None
+        assert funcion.__code__.co_freevars == ()
+
+    def test_rutas_de_tipos_raros_cuentan_como_afuera(self, gancho, tmp_path):
+        class Ruta:
+            def __fspath__(self):
+                return str(tmp_path / "adentro.txt")
+
+        with pytest.raises(PermissionError):
+            gancho("open", (Ruta(), "w", None))
+        with pytest.raises(PermissionError):
+            gancho("open", (Ruta(), "r", None))
+        gancho("open", (tmp_path / "adentro.txt", "w", None))  # pathlib sí
+        gancho("open", (str(tmp_path / "adentro.txt").encode(), "w", None))  # bytes sí
+
+    def test_utime_con_tiempos_dentro_de_la_carpeta(self, gancho, tmp_path):
+        gancho("os.utime", (str(tmp_path / "a.txt"), (1, 2), None, None))
+        with pytest.raises(PermissionError):
+            gancho("os.utime", (str(tmp_path.parent / "a.txt"), (1, 2), None, None))
