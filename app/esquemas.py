@@ -624,6 +624,7 @@ class TrazaEvaluacion(Estricto):
 
 class ResultadoLaboratorio(Estricto):
     laboratorio_id: UUID
+    evaluacion_id: UUID  # la publicada que cuenta: el estudiante abre su detalle (D-23)
     titulo: str
     cohorte: str
     nota_final: float = Field(ge=NOTA_MINIMA, le=NOTA_MAXIMA, allow_inf_nan=False)

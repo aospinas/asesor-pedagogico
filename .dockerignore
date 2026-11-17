@@ -1,0 +1,13 @@
+# Lo que NO entra a la imagen (ni al contexto de docker build)
+.env
+.env.*
+!.env.example
+.venv/
+.git/
+.claude/
+**/__pycache__/
+.pytest_cache/
+.ruff_cache/
+almacen_local/
+frontend/node_modules/
+frontend/dist/

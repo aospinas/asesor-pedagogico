@@ -185,7 +185,11 @@ Puntos que hay que conocer antes de tocar código:
   recalculada, aprobar, publicar, traza y la vista del estudiante. Y el informe integrado y
   el mapa mental (`app/informes/` y `app/api/informe.py`, D-22): números del backend, plan de
   la IA guardado con huella y PDF con WeasyPrint (en Windows no carga: la ruta responde 503).
-  Falta el frontend.
+  Y el frontend del estudiante y de la revisión docente (`frontend/`, D-23): FastAPI sirve
+  `frontend/dist` con la clase `Interfaz` de `app/main.py`; una pantalla nueva agrega su primera
+  parte del camino a `PANTALLAS`. Faltan las pantallas de laboratorios y rúbricas (docente),
+  administrador y página del equipo. En `frontend/`: `npm run dev` (proxy a 127.0.0.1:8000),
+  `npm run build` y `npm test`.
 - **Cliente de IA:** `app/ia/cliente.py`. `configuracion(db)` toma la última fila de
   `config_ia` y, si no hay, las variables `LLM_*`. Con OpenAI manda
   `max_completion_tokens` y `reasoning_effort` (`LLM_ESFUERZO`) y solo pone

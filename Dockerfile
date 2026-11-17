@@ -1,7 +1,17 @@
 # Esta imagen se prueba en el PC con /probar-imagen, la vuelve a probar el CI
 # y la construye Render al publicar.
 # Plan B: si algo falla en 3.15, cambia esta línea a 3.12 (también está probada).
+# (El ARG va antes del primer FROM para que lo vea la etapa de Python.)
 ARG PYTHON_VERSION=3.15
+
+# Etapa 1: el frontend (React). Solo queda la carpeta dist; Node no va en la imagen final.
+FROM node:22-bookworm-slim AS web
+WORKDIR /web
+COPY frontend/package.json frontend/package-lock.json ./
+RUN npm ci --no-audit --no-fund
+COPY frontend/ ./
+RUN npm run build
+
 FROM python:${PYTHON_VERSION}-slim
 
 # Librerías del sistema que necesita WeasyPrint para generar el informe en PDF
@@ -18,6 +28,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY app ./app
 COPY prompts ./prompts
+COPY --from=web /web/dist ./frontend/dist
 COPY alembic.ini .
 COPY migraciones ./migraciones
 

@@ -143,6 +143,7 @@ def calcular(db: Session, estudiante_id: uuid.UUID) -> Datos:
     laboratorios = [
         ResultadoLaboratorio(
             laboratorio_id=p.laboratorio.id,
+            evaluacion_id=p.evaluacion.id,
             titulo=p.laboratorio.titulo,
             cohorte=p.cohorte.nombre,
             nota_final=p.evaluacion.nota_final,
