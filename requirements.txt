@@ -29,6 +29,8 @@ cffi==2.1.1
     #   weasyprint
 click==8.5.1
     # via uvicorn
+colorama==0.4.6 ; sys_platform == 'win32'
+    # via pytest
 cssselect2==0.10.1
     # via weasyprint
 deprecated==3.0.1
@@ -57,6 +59,8 @@ idna==3.20
     #   anyio
     #   httpx
     #   httpx2
+iniconfig==2.3.1
+    # via pytest
 jinja2==3.1.6
     # via -r requirements.in
 jiter==0.19.0
@@ -74,9 +78,13 @@ openai==3.51.0
 opentelemetry-api==1.45.2
     # via fastapi
 packaging==26.3
-    # via limits
+    # via
+    #   limits
+    #   pytest
 pillow==13.0.0
     # via weasyprint
+pluggy==1.7.0
+    # via pytest
 psycopg==3.3.9
     # via -r requirements.in
 psycopg-binary==3.3.9 ; implementation_name != 'pypy'
@@ -95,17 +103,23 @@ pydantic-settings==2.16.3
     # via -r requirements.in
 pydyf==0.13.0
     # via weasyprint
+pygments==2.21.0
+    # via pytest
 pyjwt==2.15.1
     # via -r requirements.in
 pymupdf==1.28.2
     # via -r requirements.in
 pyphen==0.18.1
     # via weasyprint
+pytest==9.2.0
+    # via -r requirements.in
 python-dotenv==1.2.4
     # via pydantic-settings
 python-multipart==0.0.33
     # via -r requirements.in
 rapidfuzz==3.14.6
+    # via -r requirements.in
+ruff==0.17.5
     # via -r requirements.in
 slowapi==0.1.10
     # via -r requirements.in

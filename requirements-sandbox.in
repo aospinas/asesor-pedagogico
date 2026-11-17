@@ -1,0 +1,5 @@
+# Lo que trae la imagen del sandbox (sandbox.Dockerfile). Se compila con:
+#   uv pip compile --universal --python-version 3.12 requirements-sandbox.in -o requirements-sandbox.txt
+-c requirements.txt
+pytest
+ruff

@@ -33,6 +33,7 @@ from app.config import ajustes
 from app.db import BaseNoDisponible
 from app.evaluador import motor as motor_evaluador
 from app.mensajes import explicar
+from app.sandbox import preparar_proceso_web
 
 registro = logging.getLogger("asesor")
 
@@ -53,6 +54,11 @@ app = FastAPI(
     openapi_url=None,  # sin esto, /openapi.json publica todas las rutas sin sesión
 )
 app.state.limiter = limitador
+
+# Modo proceso (Render): antes de crear cualquier proceso hijo, los secretos salen de
+# os.environ y el proceso web queda protegido contra lecturas de /proc (D-18).
+if ajustes().sandbox_mode == "proceso":
+    preparar_proceso_web()
 
 METODOS_QUE_CAMBIAN_DATOS = {"POST", "PUT", "PATCH", "DELETE"}
 # El archivo más grande que se acepta (la rúbrica, 5 MB) más el sobre del formulario.

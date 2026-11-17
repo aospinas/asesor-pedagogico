@@ -17,3 +17,6 @@ weasyprint
 jinja2
 httpx
 slowapi
+# El sandbox en modo proceso (Render) corre ruff y pytest sobre el código de la entrega (RF-10, D-18)
+pytest
+ruff

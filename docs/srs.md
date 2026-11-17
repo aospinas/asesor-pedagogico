@@ -323,7 +323,7 @@ El código del estudiante se revisa primero sin ejecutarlo; solo las pruebas uni
 | --- | --- | --- | --- |
 | 1. Sintaxis | `ast.parse` de Python sobre cada archivo `.py` | No | Archivos con error y línea |
 | 2. Estilo y errores comunes | ruff | No | Cantidad de hallazgos por tipo |
-| 3. Seguridad del código entregado | ruff con las reglas S (las mismas de bandit) | No | Hallazgos de severidad media y alta |
+| 3. Seguridad del código entregado | ruff con las reglas S (las mismas de bandit) | No | Hallazgos de las reglas S (ruff no tiene severidad, D-18) |
 | 4. Pruebas unitarias | pytest, solo si la entrega trae pruebas | Sí, en el sandbox | Pruebas que pasan y fallan |
 
 Los resultados de estos pasos se le pasan a la IA como evidencia objetiva y se muestran al docente tal cual salieron.
@@ -337,11 +337,11 @@ Los resultados de estos pasos se le pasan a la IA como evidencia objetiva y se m
 | Memoria | 256 MB | `RLIMIT_AS` | `--memory 256m` |
 | Procesos hijos | 32 | `RLIMIT_NPROC` | `--pids-limit 32` |
 | Tamaño de archivos escritos | 10 MB | `RLIMIT_FSIZE` | sistema de archivos de solo lectura + carpeta temporal |
-| Red | Bloqueada | Se anula el módulo `socket` con un `sitecustomize.py` que lanza error | `--network none` |
-| Secretos | Ninguno | El proceso arranca con variables de entorno vacías | Igual |
+| Red | Bloqueada | No se ejecuta código del estudiante (pruebas apagadas, D-18) | `--network none` |
+| Secretos | Ninguno | El proceso arranca con variables de entorno vacías y la app saca sus secretos de `os.environ` al arrancar (D-18) | Igual |
 | Archivos | Solo una carpeta temporal | Copia en `/tmp/sandbox-<id>` que se borra al terminar | Volumen temporal que se borra |
 
-**Limitación honesta.** En el plan gratis de Render no hay Docker dentro del contenedor, así que el aislamiento es por proceso. El bloqueo de red por `sitecustomize` frena el código Python normal, pero no es tan fuerte como `--network none`. Por eso la ejecución de pruebas en la nube se puede apagar por laboratorio, y la demostración del sandbox completo se hace en modo local.
+**Limitación honesta.** En el plan gratis de Render no hay Docker dentro del contenedor, así que el aislamiento es por proceso. Un gancho de auditoría frena el código Python normal (red, procesos, archivos de afuera), pero no es tan fuerte como `--network none`. Por eso en la nube las pruebas del estudiante no se ejecutan (`SANDBOX_PRUEBAS=false`; la app no arranca en producción si se encienden en modo proceso) y la demostración del sandbox completo se hace en modo local. Detalle en D-18.
 
 **Pruebas del propio sandbox:** un script que intenta descargar una página (debe fallar), uno con ciclo infinito (debe cortarse a los 60 s), uno que pide 1 GB de memoria (debe fallar) y uno que lee variables de entorno (debe verlas vacías).
 
@@ -558,6 +558,8 @@ Cada punto del enunciado tiene su requisito, el módulo donde vive y la prueba q
 | C2 Evaluación estructurada | RNF-01, RNF-02 | `app/esquemas.py`, `app/evaluador/nota.py` | `tests/test_nota.py`: 5 casos de la fórmula | Pendiente |
 | C3 Verificación del código | RF-10, RNF-03 | `app/sandbox/` | `tests/test_sandbox.py`: red, ciclo infinito, memoria, entorno | Pendiente |
 | C4 Modelos configurables | RF-19, RF-20, RNF-04, RNF-14 | `app/ia/cliente.py`, `app/api/config_ia.py` | `tests/test_cliente_ia.py` con los 3 proveedores simulados; `tests/test_config_ia.py`: configuración, precios por modelo y panel de costos | Hecho (D-18) |
+| C3 Verificación del código | RF-10, RNF-03 | `app/sandbox/` | `tests/test_sandbox.py`: red, ciclo infinito, memoria, entorno | Hecho |
+| C4 Modelos configurables | RF-19, RNF-04 | `app/ia/cliente.py` | `tests/test_cliente_ia.py` con los 3 proveedores simulados | Pendiente |
 | C5 Despliegue y calidad | RF-01, RF-02, RNF-05 a RNF-07, RNF-10 a RNF-12 | `Dockerfile`, `.github/workflows/ci.yml` | `tests/test_acceso.py` + CI en verde + URL pública | Pendiente |
 | C6 Trazabilidad y supervisión | RF-12, RF-14, RF-15, RNF-08, RNF-09 | `app/auditoria/`, pantalla de revisión | `tests/test_traza.py`: cambio de nivel queda auditado | Pendiente |
 
