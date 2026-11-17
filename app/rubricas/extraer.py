@@ -38,6 +38,7 @@ TIPOS_PERMITIDOS = "Sube la rúbrica en PDF, Word, texto o JSON."
 NO_ABRE_WORD = "No se pudo abrir el documento de Word."
 NO_ABRE_PDF = "No se pudo leer el PDF."
 PDF_PESADO = "El PDF es demasiado pesado para leerlo. Súbelo en Word o texto."
+PDF_LENTO = "El PDF tardó demasiado en leerse. Súbelo en Word o texto."
 
 _PARRAFO = re.compile(r"</w:p>")
 _CELDA = re.compile(r"</w:tc>")
@@ -132,12 +133,18 @@ def _de_pdf(contenido: bytes) -> str:
     contexto = multiprocessing.get_context("spawn")
     cola = contexto.Queue()
     proceso = contexto.Process(target=_leer_pdf, args=(contenido, cola), daemon=True)
-    proceso.start()
     limite = time.monotonic() + TIEMPO_PDF_SEG
+    proceso.start()
     try:
         while True:
+            # El reloj se mira ANTES de cada espera y nunca se espera más de lo que queda:
+            # así el tiempo límite se cumple aunque el proceso responda muy rápido.
+            restante = limite - time.monotonic()
+            if restante <= 0:
+                estado, valor = "error", PDF_LENTO
+                break
             try:
-                estado, valor = cola.get(timeout=0.2)
+                estado, valor = cola.get(timeout=min(0.2, restante))
                 break
             except queue.Empty:
                 if not proceso.is_alive():  # murió sin responder: en Linux, por pasarse de memoria
@@ -145,9 +152,6 @@ def _de_pdf(contenido: bytes) -> str:
                         estado, valor = cola.get(timeout=0.5)
                     except queue.Empty:
                         estado, valor = "error", PDF_PESADO
-                    break
-                if time.monotonic() > limite:
-                    estado, valor = "error", "El PDF tardó demasiado en leerse. Súbelo en Word o texto."
                     break
     finally:
         proceso.join(timeout=1)
