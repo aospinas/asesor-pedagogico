@@ -55,7 +55,7 @@ Una entrada por decisión: qué se decidió, por qué y qué se descartó.
 - **Decisión:** Andrés crea el repo. Claude Code trabaja en ramas `feat/<modulo>`, las sube y abre un PR. Andrés revisa el PR en GitHub, espera el CI en verde, hace el merge y luego `git pull`. Es el mismo flujo del proyecto SECOP TIC.
 - **Por qué:** el merge del PR es la puerta humana final antes de producción, y queda registrada en GitHub como evidencia de la supervisión.
 - **Cómo se hace cumplir:** el guardrail bloquea push a `main`, `gh pr merge` y merges locales de ramas.
-- **Quién desarrolla:** todo el desarrollo lo lleva Andrés con Claude Code; Santiago Arias Aguirre figura como integrante del equipo.
+- **Quién desarrolla:** todo el desarrollo lo lleva Andrés con Claude Code; Santiago Arias Aguirre y Jerónimo Aristizabal figuran como integrantes del equipo.
 
 ## D-10 · La documentación de la API queda cerrada para todos (15-nov-2026)
 

@@ -5,7 +5,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 # Asesor Pedagógico Inteligente
 
 Proyecto final de Profundización I - IA (Universidad de Manizales).
-Equipo: Andrés Ospina Silva y Santiago Arias Aguirre. El desarrollo lo lleva Andrés.
+Equipo: Andrés Ospina Silva, Santiago Arias Aguirre y Jerónimo Aristizabal. El desarrollo lo lleva Andrés.
 
 Plataforma web que evalúa laboratorios con IA. Regla de oro:
 **la IA propone, el backend calcula, el docente aprueba.**
