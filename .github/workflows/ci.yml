@@ -32,11 +32,16 @@ jobs:
           ruff check .
           ruff format --check .
 
+      - name: Imagen del sandbox (para probar también el modo docker)
+        run: docker build -q -t asesor-sandbox:1 -f sandbox.Dockerfile .
+
       - name: Pruebas
         run: pytest -q --cov=app --cov-report=term-missing
 
       - name: Dependencias con vulnerabilidades conocidas (OWASP A03)
-        run: pip-audit -r requirements.txt
+        run: |
+          pip-audit -r requirements.txt
+          pip-audit -r requirements-sandbox.txt
 
       - name: Bandit (OWASP)
         # bandit solo se instala en 3.12 (en 3.15 le falta PyYAML)
