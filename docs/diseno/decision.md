@@ -109,12 +109,18 @@ Niveles de dominio (mapa e informe): Alto ▲ `#0B5D3B` relleno · Medio ◆
 - **Código y citas de código:** monoespaciada del sistema (`ui-monospace,
   Consolas`), 13 px.
 
-## Pendientes antes de construir
+## Handoff
 
-1. Confirmar el verde oficial de la Universidad de Manizales.
-2. Fotos y rol de Santiago para la página del equipo.
-3. **Handoff:** en Claude Design, *Export → Handoff to Claude Code → Send to
-   local coding agent* sobre los tableros B, y pegar la orden en Claude Code (o
-   pasar el ZIP). Con eso se construye con la skill `frontend-design`.
-4. Agregar la fila de esta decisión a `docs/bitacora-ia.md` con `/bitacora`
-   cuando se cierre el módulo de diseño.
+Hecho el 17 nov 2026. Los dos tableros de Cordillera quedaron en
+`docs/diseno/cordillera/` (ver su `README.md`). No hizo falta *Export → Handoff
+to Claude Code* en Claude Design: el lienzo lo armó Claude Code y ya tenía los
+archivos fuente, así que se guardaron directo en el repo. Con eso se construye
+con la skill `frontend-design`.
+
+## Pendientes
+
+1. Confirmar el verde oficial de la Universidad de Manizales antes de construir.
+2. **Al final del proyecto:** la página del equipo (pantalla 5). El equipo son
+   **3 personas**, no 2 como dicen los bocetos: faltan el nombre de la tercera
+   persona, la foto de cada uno (retrato real, no de stock) y su rol. Mientras
+   tanto la pantalla se construye con espacios marcados "[…]".
