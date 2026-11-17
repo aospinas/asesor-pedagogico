@@ -12,7 +12,7 @@ que llega de afuera (IA, docente, estudiante) tiene campo de nota.
 import os
 from datetime import datetime
 from enum import StrEnum
-from typing import Annotated, Any, Self
+from typing import Annotated, Any, Literal, Self
 from urllib.parse import urlsplit
 from uuid import UUID
 
@@ -45,6 +45,7 @@ URL_POR_PROVEEDOR = {
 }
 # Equipos donde puede estar Ollama; se cambia con la variable OLLAMA_HOSTS_PERMITIDOS
 OLLAMA_HOSTS_POR_DEFECTO = "localhost,127.0.0.1"
+OLLAMA_PUERTO = 11434
 
 
 class Estricto(BaseModel):
@@ -524,6 +525,9 @@ class Evaluacion(Estricto):
     aprobada_por: UUID | None = None
     fecha_aprobacion: datetime | None = None
     fecha_publicacion: datetime | None = None
+    # Por qué sube en la bandeja y, si algo no salió, un aviso para el docente (texto nuestro)
+    motivos: list[MotivoPrioridad] = Field(default_factory=list)
+    aviso: str | None = Field(default=None, max_length=300)
 
 
 class EvaluacionResumen(Estricto):
@@ -684,6 +688,17 @@ class ConfigIA(Estricto):
     proveedor: ProveedorIA
     modelo: str = Field(min_length=1, max_length=120)
     base_url: str = Field(min_length=1, max_length=300)
+    # Precio por millón de tokens de este modelo (RF-20). Vacío: se usan LLM_PRECIO_*.
+    # Al cambiar de modelo hay que poner sus precios, o el panel de costos mostrará otros.
+    precio_entrada_usd: float | None = Field(default=None, ge=0, le=1000, allow_inf_nan=False)
+    precio_salida_usd: float | None = Field(default=None, ge=0, le=1000, allow_inf_nan=False)
+
+    @model_validator(mode="after")
+    def _los_dos_precios_o_ninguno(self) -> Self:
+        # Con uno solo, el costo mezclaría el precio de este modelo con el de LLM_PRECIO_*
+        if (self.precio_entrada_usd is None) != (self.precio_salida_usd is None):
+            raise ValueError("Pon los dos precios del modelo (entrada y salida) o ninguno.")
+        return self
 
     @model_validator(mode="after")
     def _direccion_permitida(self) -> Self:
@@ -707,7 +722,66 @@ class ConfigIA(Estricto):
             permitidos = os.environ.get("OLLAMA_HOSTS_PERMITIDOS", OLLAMA_HOSTS_POR_DEFECTO)
             if host not in {h.strip().lower() for h in permitidos.split(",") if h.strip()}:
                 raise ValueError("Ese equipo no está en la lista de equipos permitidos para Ollama.")
+            # Solo el puerto y la ruta de Ollama: así no sirve para tantear otros servicios del equipo.
+            if partes.port != OLLAMA_PUERTO or partes.path.rstrip("/") != "/v1":
+                raise ValueError(f"Para Ollama la dirección debe ser http://<equipo>:{OLLAMA_PUERTO}/v1.")
         return self
+
+
+class ConfigIAVista(Estricto):
+    """Lo que ve el administrador de la configuración de IA. Nunca trae la llave: solo si está."""
+
+    proveedor: ProveedorIA
+    modelo: str
+    base_url: str
+    origen: Literal["base", "entorno", "sin_configurar"] = Field(
+        description='"base" si la eligió el administrador, "entorno" si sale de las variables, '
+        '"sin_configurar" si no hay modelo en ninguna parte'
+    )
+    llave_configurada: bool
+    # Los precios con que se calcula el costo (los del modelo o, si no tiene, los de LLM_PRECIO_*)
+    precio_entrada_usd: float
+    precio_salida_usd: float
+    fecha: datetime | None = None
+
+
+class PruebaConexion(Estricto):
+    ok: bool
+    proveedor: ProveedorIA
+    modelo: str
+    mensaje: str = Field(max_length=300)
+
+
+class RespuestaPrueba(Estricto):
+    """Lo que debe responder la IA en la prueba de conexión: {"ok": true}."""
+
+    ok: bool
+
+
+class DescripcionImagen(Estricto):
+    """Salida de la IA al describir una imagen de la entrega (RF-09). Sin notas."""
+
+    descripcion: str = Field(min_length=1, max_length=1500)
+
+
+class CostoEvaluacion(Estricto):
+    evaluacion_id: UUID
+    entrega_id: UUID
+    fecha: datetime
+    proveedor: ProveedorIA
+    modelo: str
+    tokens_entrada: int = Field(ge=0)
+    tokens_salida: int = Field(ge=0)
+    costo_usd: float = Field(ge=0, allow_inf_nan=False)
+
+
+class Costos(Estricto):
+    """Panel de costos (RF-20): totales y las evaluaciones de la página pedida."""
+
+    tokens_entrada: int = Field(ge=0)
+    tokens_salida: int = Field(ge=0)
+    costo_usd: float = Field(ge=0, allow_inf_nan=False)
+    evaluaciones: list[CostoEvaluacion]
 
 
 class RegistroAuditoria(Estricto):

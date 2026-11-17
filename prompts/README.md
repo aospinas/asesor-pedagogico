@@ -5,7 +5,8 @@ publicada: se crea la siguiente (`_v2`) y cada evaluación guarda cuál usó.
 
 | Archivo | Para qué | Estado |
 | --- | --- | --- |
-| `evaluar_criterio_v1.md` | Proponer el nivel de un criterio con evidencias | Por crear en el módulo evaluador |
+| `evaluar_criterio_v1.md` | Proponer el nivel de un criterio con evidencias | Publicado (módulo evaluador). El material va en `<entrega>...</entrega>` como JSON con `<` escapado |
+| `describir_imagen_v1.md` | Describir una imagen de la entrega para el evaluador | Publicado (módulo evaluador) |
 | `interpretar_rubrica_v1.md` | Convertir una rúbrica en PDF o Word a `RubricaEstructura` | Publicado (módulo rúbricas). El texto va en `<rubrica>...</rubrica>` |
 | `plan_fortalecimiento_v1.md` | Redactar el plan a partir de datos ya calculados | Por crear en el módulo informes |
 

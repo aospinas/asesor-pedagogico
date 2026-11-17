@@ -2,6 +2,7 @@
 
 import uuid
 from datetime import timedelta
+from functools import partial
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile, status
@@ -131,7 +132,8 @@ def cargar_rubrica(
             raise HTTPException(status.HTTP_400_BAD_REQUEST, str(error)) from None
         if ia is cliente.pedir_json:  # sin IA configurada no se cuenta el intento: se avisa de una vez
             try:
-                cliente.configuracion()
+                # La que eligió el administrador (RF-19) o la de las variables de entorno
+                ia = partial(cliente.pedir_json, config=cliente.configuracion(db))
             except ErrorIA:
                 raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, IA_NO_CONFIGURADA) from None
         if _conversiones_recientes(db, usuario_id) >= CONVERSIONES_POR_HORA:
