@@ -49,6 +49,14 @@ def calcular_nota(rubrica: RubricaEstructura, niveles_elegidos: dict[str, str]) 
     return float(nota)
 
 
+def promedio(notas: list[float]) -> float | None:
+    """Promedio de notas ya calculadas, a un decimal. No inventa una nota nueva de un criterio."""
+    if not notas:
+        return None
+    total = sum((Decimal(str(nota)) for nota in notas), Decimal("0")) / Decimal(len(notas))
+    return float(total.quantize(Decimal("0.1"), rounding=ROUND_HALF_UP))
+
+
 def nivel_de_dominio(nota: float) -> NivelDominio:
     """Nivel de dominio usado en el informe y el mapa mental."""
     if nota >= 4.5:

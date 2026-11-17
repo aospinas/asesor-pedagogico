@@ -390,3 +390,9 @@ El módulo se hizo con **Opus 5.5**: Mythos 5.2 y Fable 5.2 no tenían créditos
 - **Auditoría:** `evaluacion_terminada` cuenta las verificaciones.
 - **Pendiente para el módulo de revisión docente:** la vista del estudiante (`/publicada`) no debe reusar `a_esquema`, que trae las verificaciones, la alerta de inyección y los costos.
 
+## D-21 · PDF del informe con respaldo si WeasyPrint no tiene librerías (17-nov-2026)
+
+- **Decisión:** el informe se arma en HTML y, si WeasyPrint puede cargar Pango, el PDF sale de ahí (es lo que usa Docker y Render). Si no puede (Windows sin esas librerías), el mismo texto se escribe con PyMuPDF, que ya está en el proyecto.
+- **Por qué:** en el PC de desarrollo WeasyPrint no arranca, y el estudiante igual tiene que poder descargar el informe.
+- **Qué no cambia:** los números siguen saliendo de `nota.py`. La IA solo redacta el plan, y si no está configurada el PDF sale igual, sin plan.
+

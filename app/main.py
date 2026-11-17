@@ -21,8 +21,12 @@ from app.api import (
     config_ia,
     entregas,
     evaluaciones,
+    informe,
     laboratorios,
+    mapa,
     portafolio,
+    proyecto,
+    revision,
     rubricas,
     sesion,
     usuarios,
@@ -217,4 +221,41 @@ app.include_router(rubricas.router)
 app.include_router(entregas.router)
 app.include_router(portafolio.router)
 app.include_router(evaluaciones.router)
+app.include_router(revision.router)
+app.include_router(informe.router)
+app.include_router(mapa.router)
+app.include_router(proyecto.router)
 app.include_router(config_ia.router)
+
+
+def _servir_interfaz() -> None:
+    """Si existe el build del frontend, la misma app lo sirve. Las rutas /api quedan primero."""
+    from pathlib import Path
+
+    from starlette.exceptions import HTTPException as ErrorRuta
+    from starlette.staticfiles import StaticFiles
+
+    carpeta = Path(__file__).resolve().parents[1] / "frontend" / "dist"
+    if not carpeta.is_dir():
+        return
+
+    paginas = {"", "proyecto", "bitacora", "bandeja", "revision", "informe", "mapa", "publicada"}
+
+    class Sitio(StaticFiles):
+        async def get_response(self, path: str, scope):
+            try:
+                return await super().get_response(path, scope)
+            except ErrorRuta as error:
+                # En Windows la raíz llega como ".". Solo las pantallas caen en index.html.
+                limpio = path.replace("\\", "/").strip("/")
+                if limpio in {"", "."}:
+                    limpio = ""
+                primera = limpio.split("/", 1)[0]
+                if error.status_code != 404 or "." in limpio or primera not in paginas:
+                    raise
+                return await super().get_response("index.html", scope)
+
+    app.mount("/", Sitio(directory=carpeta), name="interfaz")
+
+
+_servir_interfaz()

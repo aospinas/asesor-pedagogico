@@ -1,11 +1,15 @@
 # Frontend
 
-Esta carpeta queda vacía hasta pasar la Puerta 0 (diseño elegido en Claude Design).
+Interfaz en React (dirección Cordillera, `docs/diseno/decision.md`).
 
-Pasos:
+```powershell
+cd frontend
+npm install
+npm run dev
+```
 
-1. En Claude Code: `/disenar todo`.
-2. Escoger una dirección y hacer el handoff desde Claude Design.
-3. Crear el proyecto: `npm create vite@latest . -- --template react-ts`.
-4. Instalar el mapa mental: `npm install cytoscape`.
-5. Construir con la skill `frontend-design` activa, siguiendo `docs/diseno/decision.md`.
+Abre http://localhost:5173. La API tiene que estar en http://127.0.0.1:8000
+(`uvicorn app.main:app --reload`). El dev server reenvía `/api` hacia allá.
+
+`npm run build` deja los archivos en `frontend/dist`. Si esa carpeta existe,
+la API los sirve en la misma dirección (así Render muestra la interfaz).
