@@ -21,7 +21,7 @@ from app.modelos import Evidencia
 MAXIMO_MATERIAL = 60_000  # caracteres (ya escapados) de material que van a la IA en cada criterio
 MAXIMO_POR_ARCHIVO_CODIGO = 12_000
 # Lo que ocupa la estructura del JSON de cada parte (claves, sangría, número de página...).
-# Sin contarlo, cientos de archivos pequeños pasaban el tope (D-18).
+# Sin contarlo, cientos de archivos pequeños pasaban el tope (D-19).
 COSTO_POR_PARTE = 60
 
 

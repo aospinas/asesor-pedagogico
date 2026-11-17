@@ -1,4 +1,4 @@
-"""Arreglos de la revisión del evaluador (D-18): topes, cola, citas, material e imágenes."""
+"""Arreglos de la revisión del evaluador (D-19): topes, cola, citas, material e imágenes."""
 
 import time
 import tracemalloc

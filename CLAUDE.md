@@ -178,9 +178,10 @@ Puntos que hay que conocer antes de tocar código:
 - **Estado actual:** existen el contrato (`esquemas.py`), el cálculo de la nota,
   el módulo auth (sesión, usuarios, auditoría), el de rúbricas (cohortes,
   laboratorios, carga con IA y versiones) y el de entregas (subida, portafolio,
-  almacén de archivos) y el evaluador (motor, configuración de IA, costos).
-  Los paquetes `sandbox` e `informes` están vacíos y se llenan en el orden de
-  `docs/arranque-claude-code.md`.
+  almacén de archivos), el evaluador (motor, configuración de IA, costos; D-19) y el
+  sandbox (`app/sandbox/`, D-18), que devuelve `list[VerificacionCodigo]` con
+  `verificar(archivos)`; todavía no está conectado al evaluador. El paquete `informes`
+  está vacío y se llena en el orden de `docs/arranque-claude-code.md`.
 - **Cliente de IA:** `app/ia/cliente.py`. `configuracion(db)` toma la última fila de
   `config_ia` y, si no hay, las variables `LLM_*`. Con OpenAI manda
   `max_completion_tokens` y `reasoning_effort` (`LLM_ESFUERZO`) y solo pone
@@ -194,10 +195,6 @@ Puntos que hay que conocer antes de tocar código:
   En las pruebas: fixture `ia_evaluador` (respuestas por criterio) y `simulada_github`; el
   fixture autouse `_evaluador_inmediato` cambia el grupo de hilos por uno que corre la
   evaluación ahí mismo (termina antes de que vuelva la respuesta) y vacía la cola.
-  almacén de archivos). `app/ia/cliente.py` es un cliente
-  mínimo (`pedir_json`) que el evaluador amplía. El sandbox (`app/sandbox/`,
-  D-18) devuelve `list[VerificacionCodigo]` con `verificar(archivos)`. El paquete `informes` está
-  vacío y se llena en el orden de `docs/arranque-claude-code.md`.
 - **Rúbricas:** la versión vigente es la de número más alto; para evaluar se usa
   `app.rubricas.versiones.version_evaluable`, que falla si la vigente tiene errores.
   En las pruebas la IA se simula con el fixture `ia_simulada` (`tests/conftest.py`).

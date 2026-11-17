@@ -1,4 +1,4 @@
-"""Arreglos de la segunda revisión del evaluador (D-18): cola, apagado, cierre, plazo y material."""
+"""Arreglos de la segunda revisión del evaluador (D-19): cola, apagado, cierre, plazo y material."""
 
 import logging
 import threading

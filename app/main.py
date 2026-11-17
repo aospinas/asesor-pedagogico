@@ -42,7 +42,7 @@ registro = logging.getLogger("asesor")
 async def ciclo_de_vida(_app: FastAPI):
     yield
     # Al apagar (cada despliegue): las evaluaciones que esperan turno no se empiezan y pasan
-    # a revisión manual de una vez, en vez de quedar "En proceso" 30 minutos (D-18).
+    # a revisión manual de una vez, en vez de quedar "En proceso" 30 minutos (D-19).
     motor_evaluador.apagar()
 
 
