@@ -280,6 +280,8 @@ def ia_evaluador(motor):
     app.dependency_overrides[evaluaciones.obtener_config] = lambda: config
     app.dependency_overrides[evaluaciones.obtener_bajar_github] = lambda: simulada_github
     simulada.github = simulada_github
+    app.dependency_overrides[evaluaciones.obtener_verificar] = lambda: simulado_sandbox
+    simulada.sandbox = simulado_sandbox
     return simulada
 
 
@@ -302,10 +304,45 @@ class _GitHubSimulado:
 simulada_github = _GitHubSimulado()
 
 
+class _SandboxSimulado:
+    """El sandbox de mentira: devuelve `respuesta` (lista de VerificacionCodigo o una
+    excepción) y guarda con qué archivos lo llamaron. El de verdad está en test_sandbox.py."""
+
+    def __init__(self):
+        self.respuesta = None
+        self.llamadas: list[list] = []
+
+    def __call__(self, archivos):
+        from app.esquemas import TipoVerificacion, VerificacionCodigo
+
+        self.llamadas.append(list(archivos))
+        if isinstance(self.respuesta, Exception):
+            raise self.respuesta
+        if callable(self.respuesta):  # una función que decide qué devolver
+            return self.respuesta(archivos)
+        if self.respuesta is not None:
+            return self.respuesta
+        return [
+            VerificacionCodigo(
+                tipo=TipoVerificacion.SINTAXIS,
+                comando="ast.parse",
+                codigo_salida=0,
+                salida="Sin errores de sintaxis.",
+                duracion_ms=12,
+                tiempo_agotado=False,
+            )
+        ]
+
+
+simulado_sandbox = _SandboxSimulado()
+
+
 @pytest.fixture(autouse=True)
 def _github_limpio():
     simulada_github.respuesta = None
     simulada_github.pedidos.clear()
+    simulado_sandbox.respuesta = None
+    simulado_sandbox.llamadas.clear()
 
 
 class _EjecutorInmediato:

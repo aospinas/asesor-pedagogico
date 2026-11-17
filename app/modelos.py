@@ -241,6 +241,24 @@ class EvaluacionCriterio(Base):
     intentos: Mapped[int] = mapped_column(Integer, default=0)
 
 
+class VerificacionCodigoFila(Base):
+    """Un resultado del sandbox para una evaluación (RF-10, SRS sección 8). La salida trae
+    texto del estudiante (rutas, lo que imprimen sus pruebas): se muestra como texto escapado y
+    a la IA le llega como datos."""
+
+    __tablename__ = "verificaciones_codigo"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    evaluacion_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("evaluaciones.id"), index=True)
+    orden: Mapped[int] = mapped_column(Integer)
+    tipo: Mapped[str] = mapped_column(String(20))
+    comando: Mapped[str] = mapped_column(String(500))
+    codigo_salida: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    salida: Mapped[str] = mapped_column(Text)
+    duracion_ms: Mapped[int] = mapped_column(Integer)
+    tiempo_agotado: Mapped[bool] = mapped_column(Boolean)
+
+
 class ConfigIAFila(Base):
     """Proveedor y modelo de IA elegidos por el administrador (RF-19). La llave NO va aquí:
     vive en la variable LLM_API_KEY. Cada cambio es una fila nueva; manda la última."""

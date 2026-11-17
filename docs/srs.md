@@ -238,7 +238,7 @@ Trece tablas en PostgreSQL. Las rúbricas y las evaluaciones nunca se sobrescrib
 | `evidencias` | id, entrega\_id, tipo (pdf, codigo, imagen, diapositivas), nombre, sha256, tamano\_bytes, tipo\_mime, ruta\_storage, texto\_extraido (JSON), resumen, fecha | Archivos y su huella digital (D-17) |
 | `evaluaciones` | id, entrega\_id, rubrica\_version\_id, lanzada\_por, proveedor, modelo, version\_prompt, estado, nota\_preliminar, nota\_final, tokens\_entrada, tokens\_salida, costo\_usd, alerta\_inyeccion, reglas\_inyeccion, aviso, fecha, actualizada, aprobada\_por, fecha\_aprobacion, fecha\_publicacion | La traza principal (C6, D-19) |
 | `evaluacion_criterios` | id, evaluacion\_id, criterio\_id, orden, nivel\_ia, nivel\_final, justificacion, evidencias (JSON, cada cita con su marca de encontrada), fortalezas, debilidades, recomendaciones, intentos | Resultado por criterio (D-19) |
-| `verificaciones_codigo` | id, evaluacion\_id, tipo (sintaxis, estatico, pruebas), comando, codigo\_salida, salida, duracion\_ms, tiempo\_agotado | Resultados del sandbox (C3) |
+| `verificaciones_codigo` | id, evaluacion\_id, orden, tipo (sintaxis, estatico, pruebas), comando, codigo\_salida, salida, duracion\_ms, tiempo\_agotado | Resultados del sandbox (C3, D-20) |
 | `revisiones_docente` | id, evaluacion\_id, docente\_id, accion, valor\_anterior, valor\_nuevo, justificacion, fecha | Human in the loop |
 | `auditoria` | id, usuario\_id, accion, entidad, entidad\_id, detalle\_json, ip, fecha | Registro de todo cambio (OWASP A09) |
 | `config_ia` | id, proveedor, modelo, base\_url, precio\_entrada\_usd, precio\_salida\_usd, actualizado\_por, fecha | Proveedor configurable (C4); manda la última fila y, si no hay, las variables de entorno. La llave va en variables de entorno, no aquí (D-19) |
@@ -550,7 +550,7 @@ Cada punto del enunciado tiene su requisito, el módulo donde vive y la prueba q
 | F1 Entrada de información | RF-03, RF-07 | `app/api/laboratorios.py`, `app/api/entregas.py` | `tests/test_laboratorios.py`; `tests/test_entregas.py`: PDF sin texto rechazado | Hecho |
 | F2 Portafolio académico | RF-06, RF-08 | `app/api/portafolio.py` | `tests/test_portafolio.py`: entrega guarda versión de rúbrica | Hecho |
 | F3 Gestión de rúbricas | RF-04, RF-05 | `app/rubricas/` | `tests/test_rubricas.py`: pesos que suman 90 % bloquean | Hecho |
-| F4 Evaluación inteligente | RF-09 a RF-14 | `app/evaluador/` | `tests/test_evaluador.py` con respuesta de IA simulada | En curso: RF-09, RF-11 a RF-13 hechos (D-19); RF-10 con el sandbox y RF-14 con la revisión docente |
+| F4 Evaluación inteligente | RF-09 a RF-14 | `app/evaluador/` | `tests/test_evaluador.py` con respuesta de IA simulada; `tests/test_evaluador_sandbox.py` con el sandbox conectado | En curso: RF-09 a RF-13 hechos (D-19, D-20); RF-14 con la revisión docente |
 | F5 Informe integrado | RF-16 | `app/informes/` | `tests/test_informe.py`: PDF generado con 2 cohortes | Pendiente |
 | F6 Mapa mental | RF-17 | `frontend/src/mapa/`, `app/api/mapa.py` | `tests/test_mapa.py`: JSON con temas, labs y nivel | Pendiente |
 | F7 Proyecto y equipo | RF-18 | `frontend/src/paginas/Proyecto.tsx` | Revisión manual | Pendiente |

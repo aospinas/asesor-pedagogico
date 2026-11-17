@@ -54,7 +54,7 @@ def test_evaluacion_completa_con_nota_calculada_por_el_backend(entrega, ia_evalu
     assert all(e["encontrada"] is True for c in resultado["criterios"] for e in c["evidencias"])
     assert resultado["nota_preliminar"] == 5.0  # nivel más alto en todo: lo calcula nota.py
     assert resultado["nota_final"] is None  # la fija el docente al aprobar
-    assert resultado["version_prompt"] == "evaluar_criterio_v1"
+    assert resultado["version_prompt"] == "evaluar_criterio_v2"
     assert (resultado["proveedor"], resultado["modelo"]) == ("openai", "modelo-prueba")
     assert (resultado["tokens_entrada"], resultado["tokens_salida"]) == (3000, 600)
     assert resultado["costo_usd"] == pytest.approx((3000 * 0.1 + 600 * 0.5) / 1_000_000)

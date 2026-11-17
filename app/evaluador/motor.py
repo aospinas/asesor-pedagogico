@@ -2,7 +2,9 @@
 
 1. Si la entrega trae enlace de GitHub y no ZIP, se baja el código (app/evaluador/github.py).
 2. Las imágenes sin descripción se describen con visión (se guarda para no pagar dos veces).
-3. Se arma el material (app/evaluador/material.py) y se pasa por el filtro de inyección.
+   Después el sandbox (app/sandbox) revisa el código: sintaxis, ruff y, si se puede, pytest.
+3. Se arma el material (app/evaluador/material.py), con los resultados del sandbox como
+   datos, y se pasa por el filtro de inyección.
 4. Por cada criterio, la IA propone un nivel con evidencias. Si la respuesta no sirve (no es
    JSON válido, cambia el criterio o inventa un nivel) se reintenta hasta 3 veces; si sigue
    fallando, el criterio queda "Sin propuesta" y lo califica el docente.
@@ -38,6 +40,7 @@ from app.almacen import Almacen, AlmacenNoDisponible
 from app.api.seguridad import ahora
 from app.archivos import ArchivoNoValido
 from app.archivos import zip as lector_zip
+from app.archivos.zip import ArchivoCodigo
 from app.auditoria.registro import registrar
 from app.config import ajustes
 from app.esquemas import (
@@ -48,15 +51,23 @@ from app.esquemas import (
     ResultadoCriterio,
     RubricaEstructura,
     TipoEvidencia,
+    VerificacionCodigo,
 )
 from app.evaluador import citas, imagenes, inyeccion, material
 from app.evaluador.nota import ErrorDeNota, calcular_nota
 from app.ia.cliente import ErrorIA, Imagen, Uso
-from app.modelos import Entrega, Evaluacion, EvaluacionCriterio, Evidencia, RubricaVersion
+from app.modelos import (
+    Entrega,
+    Evaluacion,
+    EvaluacionCriterio,
+    Evidencia,
+    RubricaVersion,
+    VerificacionCodigoFila,
+)
 
 registro = logging.getLogger("asesor.evaluador")
 
-VERSION_PROMPT = "evaluar_criterio_v1"
+VERSION_PROMPT = "evaluar_criterio_v2"  # la v2 explica las verificaciones del sandbox (D-20)
 INTENTOS_POR_CRITERIO = 3
 MAXIMO_TOKENS_EVALUACION = 300_000
 MINUTOS_COLGADA = 30
@@ -75,6 +86,12 @@ AVISO_TOKENS = (
 AVISO_NOTA = "No se pudo calcular la nota con esta rúbrica. Califícala a mano."
 AVISO_IMAGEN = "Una imagen no se pudo describir y no entró en la evaluación."
 AVISO_ALMACEN = "No se pudo guardar el código bajado de GitHub; se evaluó sin él."
+AVISO_SANDBOX = "No se pudo verificar el código en el sandbox; se evaluó sin esa verificación."
+AVISO_SANDBOX_SIN_CORRER = "El sandbox no pudo revisar el código: mira el detalle en las verificaciones."
+# El sandbox corre una entrega a la vez y solo espera 30 s su turno. Las dos evaluaciones que
+# corren a la vez se turnan aquí con más paciencia, para no quedar con "sandbox ocupado".
+MINUTOS_ESPERA_SANDBOX = 5
+_TURNO_SANDBOX = threading.Lock()
 
 # Grupo de hilos propio: si usara el de FastAPI, una cola larga dejaría sin hilos al login.
 _EJECUTOR = ThreadPoolExecutor(max_workers=EVALUACIONES_A_LA_VEZ, thread_name_prefix="evaluador")
@@ -101,6 +118,8 @@ class Contexto:
     almacen: Almacen
     config: ConfigIA
     bajar_github: Callable[[str], bytes]
+    # El sandbox (app.sandbox.verificar). None = no se verifica el código.
+    verificar: Callable[[list[ArchivoCodigo]], list[VerificacionCodigo]] | None = None
 
 
 @cache
@@ -304,6 +323,51 @@ def _describir(evidencia: Evidencia, contexto: Contexto) -> Uso:
     return uso
 
 
+def _archivos_de_codigo(evidencias: list[Evidencia], avisos: list[str]) -> list[ArchivoCodigo]:
+    """El código de la entrega (ZIP o GitHub), ya leído al subir. Se arma ANTES de cerrar la
+    transacción: texto_extraido es una columna diferida y leerla después abriría otra."""
+    try:  # un texto_extraido mal formado tampoco tumba la evaluación (RNF-10)
+        return [
+            ArchivoCodigo(ruta=str(a["ruta"]), texto=str(a["texto"]))
+            for e in evidencias
+            if e.tipo == TipoEvidencia.CODIGO.value
+            for a in (e.texto_extraido or {}).get("archivos", [])
+        ]
+    except (KeyError, TypeError, AttributeError) as error:
+        registro.warning("Código de la entrega mal guardado: %s", type(error).__name__)
+        avisos.append(AVISO_SANDBOX)
+        return []
+
+
+def _verificar_codigo(
+    archivos: list[ArchivoCodigo], contexto: Contexto, gasto: "Gasto", avisos: list[str]
+) -> list[VerificacionCodigo]:
+    """Corre el sandbox sobre el código. El sandbox nunca lanza error (RNF-10); si algo falla
+    igual, la evaluación sigue con aviso."""
+    if contexto.verificar is None or not archivos:
+        return []
+    # La espera del turno no pasa del plazo de la evaluación
+    espera = min(MINUTOS_ESPERA_SANDBOX * 60, gasto.vence - time.monotonic())
+    if espera <= 0 or gasto.agotado or not _TURNO_SANDBOX.acquire(timeout=espera):
+        avisos.append(AVISO_SANDBOX)
+        return []
+    try:
+        resultado = contexto.verificar(archivos)
+        # Se vuelve a validar: lo que se guarda y lo que ve la IA cumple el esquema
+        verificaciones = [VerificacionCodigo.model_validate(v.model_dump()) for v in resultado]
+    except Exception as error:
+        registro.warning("Falló el sandbox: %s", type(error).__name__)
+        avisos.append(AVISO_SANDBOX)
+        return []
+    finally:
+        _TURNO_SANDBOX.release()
+    # El sandbox de verdad nunca lanza error: si no pudo correr (sin Docker, ocupado...), lo
+    # dice en una verificación sin código de salida. Entonces también va el aviso arriba.
+    if verificaciones and all(v.codigo_salida is None for v in verificaciones):
+        avisos.append(AVISO_SANDBOX_SIN_CORRER)
+    return verificaciones
+
+
 def _pedido_del_criterio(criterio: Criterio, entrega_material: material.Material) -> str:
     datos = {
         "id": criterio.id,
@@ -420,8 +484,17 @@ def _evaluar(db: Session, evaluacion_id: uuid.UUID, contexto: Contexto) -> None:
             avisos.append(AVISO_IMAGEN)
         avance()
 
+    # 2b. Verificación del código en el sandbox (RF-10). Nada del código corre aquí.
+    # Se cierra la transacción antes: la espera y el sandbox pueden tomar minutos.
+    archivos = _archivos_de_codigo(evidencias(), avisos) if contexto.verificar else []
+    db.commit()
+    verificaciones = _verificar_codigo(archivos, contexto, gasto, avisos)
+    for orden, v in enumerate(verificaciones):
+        db.add(VerificacionCodigoFila(evaluacion_id=evaluacion.id, orden=orden, **v.model_dump(mode="json")))
+    avance()
+
     # 3. Material y filtro de inyección
-    entrega_material = material.armar(evidencias())
+    entrega_material = material.armar(evidencias(), verificaciones)
     reglas = inyeccion.detectar(entrega_material.texto_plano)
     evaluacion.alerta_inyeccion = bool(reglas)
     evaluacion.reglas_inyeccion = reglas
@@ -489,6 +562,7 @@ def _evaluar(db: Session, evaluacion_id: uuid.UUID, contexto: Contexto) -> None:
             "estado": estado,
             "nota_preliminar": nota,
             "sin_propuesta": sum(1 for n in niveles.values() if n is None),
+            "verificaciones": len(verificaciones),
             "alerta_inyeccion": evaluacion.alerta_inyeccion,
             "tokens_entrada": gasto.entrada,
             "tokens_salida": gasto.salida,
