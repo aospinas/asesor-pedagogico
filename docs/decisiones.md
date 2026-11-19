@@ -453,3 +453,10 @@ El módulo se hizo con **Opus 5.5**: Mythos 5.2 y Fable 5.2 no tenían créditos
 - **Pantalla principal del estudiante** (`/mi-tablero`, ruta `GET /api/mi-tablero`, solo estudiante). La ruta no recibe id: siempre es el tablero del usuario de la sesión, así nadie puede pedir el de otro.
 - **Solo lo publicado (RNF-09):** promedio, nivel, última nota (y si subió o bajó frente a la anterior), y los tres criterios más fuertes y los tres por mejorar salen solo de evaluaciones publicadas (`calculo.publicadas_de`). De lo que no se ha publicado, el estudiante solo ve cuántos laboratorios esperan al docente, nunca una nota.
 - También muestra los laboratorios que le faltan por entregar y el cerro de Cordillera con la altura de su promedio (2.150 m a 5.321 m).
+
+## D-26: Página del proyecto y bitácora pública (19-nov-2026)
+
+- **RF-18 y RF-22:** `/proyecto` (también `/equipo`) y `/bitacora` se ven sin sesión. Las rutas `GET /api/proyecto` y `GET /api/bitacora` ya estaban en la tabla de rutas desde el contrato, como públicas; ahora existen.
+- **Proyecto:** el contenido (abstract, regla de oro, tecnologías, aportes y equipo) está en `app/api/proyecto.py`; no sale de la base ni de la IA. Donde falta el dato del equipo queda `[…]` para que cada integrante lo complete. Sin foto se muestran las iniciales.
+- **Bitácora:** se lee de `docs/bitacora-ia.md` (tabla "Registro por módulo"); el Dockerfile copia ese archivo a la imagen. Si no está, la ruta responde 503 sin tumbar la app. Tope de 30 consultas por minuto por IP.
+- **Matriz de trazabilidad** (SRS sección 13): todas las filas quedan en "Hecho".

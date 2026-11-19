@@ -674,6 +674,45 @@ class Informe(Estricto):
     generado: datetime
 
 
+# ---------- Página del proyecto y bitácora pública (RF-18, RF-22; D-26) ----------
+
+
+class Tecnologia(Estricto):
+    nombre: str
+    para_que: str
+
+
+class MiembroEquipo(Estricto):
+    nombre: str
+    rol: str
+    aporte: str
+    foto_url: str | None = None
+
+
+class Proyecto(Estricto):
+    nombre: str
+    abstract: str
+    regla: str
+    tecnologias: list[Tecnologia]
+    aportes: list[str]
+    equipo: list[MiembroEquipo]
+    repositorio: str
+
+
+class FilaBitacora(Estricto):
+    fecha: str
+    fase: str
+    herramienta: str
+    pedido: str
+    aporte: str
+    problema: str
+    decision: str
+
+
+class Bitacora(Estricto):
+    filas: list[FilaBitacora]
+
+
 # ---------- Tablero del docente (D-24) ----------
 
 
