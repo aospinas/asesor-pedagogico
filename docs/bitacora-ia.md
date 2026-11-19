@@ -3,8 +3,8 @@
 Lo pide el enunciado: herramientas, aportes, limitaciones y decisiones técnicas.
 El orquestador agrega una fila por módulo con `/bitacora`; la columna
 "Decisión humana" la escribe Andrés con sus palabras.
-En las filas del 15 al 17 de noviembre, esa columna la redactó Claude Code a pedido de
-Andrés, a partir de lo que él decidió en la sesión.
+En la fila del kit (13 de noviembre) y desde el 15 de noviembre, esa columna y la reflexión
+final las redactó Claude Code a pedido de Andrés, a partir de lo que él decidió en la sesión.
 
 ## Herramientas de IA del proyecto
 
@@ -22,7 +22,7 @@ Andrés, a partir de lo que él decidió en la sesión.
 | Fecha | Fase | Herramienta | Qué se le pidió | Qué aportó | Problema o limitación | Decisión humana |
 | --- | --- | --- | --- | --- | --- | --- |
 | 2026-11-13 | Requisitos | Claude (claude.ai) | Analizar el enunciado y redactar el SRS con RF, RNF, casos de uso, OWASP y plan de un día | SRS, arquitectura, matriz de trazabilidad | Propuso Hugging Face Spaces y al verificar se vio que Docker ya es de pago; se cambió a Render | Todo gratis salvo OpenAI, un día, OWASP solo lo aplicable, diseño elegido en Claude Design |
-| 2026-11-13 | Arranque | Claude (claude.ai) | Armar el kit del repo: CLAUDE.md, agentes, comandos, guardrails, CI, esquemas y cálculo de nota | Kit con 26 pruebas pasando en Python 3.15 | Supuso Python 3.12; se corrigió a 3.15 y se probó cada dependencia, dejando 3.12 como plan B probado. PyYAML no instala en 3.15, se ajustó uvicorn y bandit. No pudo construir la imagen Docker en su entorno, así que la prueba de Docker quedó en el CI | (completar) |
+| 2026-11-13 | Arranque | Claude (claude.ai) | Armar el kit del repo: CLAUDE.md, agentes, comandos, guardrails, CI, esquemas y cálculo de nota | Kit con 26 pruebas pasando en Python 3.15 | Supuso Python 3.12; se corrigió a 3.15 y se probó cada dependencia, dejando 3.12 como plan B probado. PyYAML no instala en 3.15, se ajustó uvicorn y bandit. No pudo construir la imagen Docker en su entorno, así que la prueba de Docker quedó en el CI | Usar Python 3.15 solo después de probar cada dependencia, con 3.12 como plan B también probado, y dejar que el CI construya la imagen Docker en cada cambio |
 | 2026-11-15 | Arranque | Claude (claude.ai) | Repartir el trabajo entre Mythos 5.2 y Opus 5.5 | Tabla de modelos por tarea, subagente depurador, modelos fijos en los subagentes | Primero supuso que el equipo no tenía acceso a Mythos y propuso Fable 5.2; Andrés aclaró que sí tiene acceso y se cambió a Mythos, dejando Fable como plan B | Usar Mythos 5.2 en lo crítico y Opus 5.5 en lo demás, con Fable 5.2 como plan B, porque el equipo sí tiene acceso a Mythos |
 | 2026-11-15 | Contrato | Claude Code con Claude Mythos 5.2 (subagentes `revisor-seguridad` con Mythos 5.2 y `revisor-calidad` con Opus 5.5) | Completar `app/esquemas.py` y hacer la tabla de rutas de la API con el rol de cada una | Modelos de usuarios, laboratorios, entregas, evaluaciones, revisión, informe y mapa; 44 rutas con rol en `app/api/rutas.py` y `docs/api.md`; 224 pruebas pasando | La primera versión tenía fallas que encontraron los revisores: la dirección de la IA aceptaba cualquier servidor (la llave podía salir), la contraseña aceptaba más de lo que soporta bcrypt, los niveles aceptaban infinito, no había topes de tamaño, faltaban esquemas de dos salidas de la IA y `/openapi.json` seguía público. Un validador de correo falló en la primera prueba y se corrigió. Los arreglos no pasaron por una segunda revisión. En el arranque, Claude Code no pudo abrir el PR: `gh` no estaba instalado y lo abrió Andrés | Aprobó el plan antes de escribir código y pidió arreglar los hallazgos recomendados de los revisores. Como no tenía `gh`, acordó que Claude Code hace el commit y sube la rama, y él abre el PR y hace el merge |
 | 2026-11-16 | Auth | Claude Code con Claude Mythos 5.2 (subagentes `revisor-seguridad` con Mythos 5.2 y `revisor-calidad` con Opus 5.5) | Hacer el inicio de sesión, los roles, la gestión de usuarios y la auditoría (RF-01, RF-02, RF-22) | Sesión con cookie segura, control de rol en las 45 rutas desde una sola tabla, usuarios creados por el administrador, clave temporal, auditoría de cada cambio, tablas y migraciones, comando para el primer administrador; 376 pruebas pasando contra PostgreSQL y 375 en SQLite | La primera versión tenía fallas que encontró el revisor de seguridad: el bloqueo por intentos se podía saltar con peticiones al mismo tiempo (hallazgo alto), cualquiera podía bloquearle la cuenta a otro, cerrar sesión no invalidaba el token, cambiar la contraseña no tenía tope de intentos, se podía dejar el sistema sin administrador y `ENTORNO` mal escrito arrancaba en modo desarrollo. Se rehízo el bloqueo y se cambió la migración. Los arreglos no pasaron por una segunda revisión. La prueba de acceso al principio solo veía `/salud` y no avisaba; las pruebas contra PostgreSQL se colgaban por usar `localhost` (se cambió a `127.0.0.1`). Claude Code no puede leer `.env` ni abrir el PR (sin `gh`): eso lo hace Andrés. Quedó pendiente para el despliegue la IP real detrás del proxy de Render | Aprobó el plan y pidió arreglar los hallazgos recomendados. Por falta de tiempo no hizo la prueba manual y decidió seguir con el merge |
@@ -41,12 +41,37 @@ Andrés, a partir de lo que él decidió en la sesión.
 | 2026-11-19 | Tablero del docente y pantallas de laboratorios y usuarios | Claude Code con Claude Opus 5.5 | Pantallas de laboratorios y rúbricas (docente) y de usuarios (administrador); rúbrica de ejemplo del Lab 01; tablero principal del docente con métricas reales (D-24) | Ruta `/api/tablero` con el flujo de las entregas, niveles, promedio por laboratorio, criterios más débiles, acuerdo entre IA y docente y alertas, todo calculado por el backend; la rúbrica de ejemplo salió del anexo de la entrega real (10 criterios, 100 puntos) | El primer intento de crear el administrador falló porque PowerShell bloquea los scripts de activación; se resolvió llamando directo al Python del entorno. El 404 de Render en `HEAD /salud` mientras despierta no afecta | Pidió crear el tablero como pantalla principal del docente y probar todo antes de seguir. Prefirió crear el administrador desde su PC en vez de escribir los usuarios directo en la base |
 | 2026-11-19 | Tablero del estudiante | Claude Code con Claude Opus 5.5 | Pantalla principal del estudiante con su avance (D-25) | Ruta `/api/mi-tablero` sin id (siempre el de la sesión) que reusa el cálculo del informe: promedio, última nota y si subió o bajó, criterios fuertes y por mejorar, laboratorios por entregar y el cerro con la altura del promedio; 5 pruebas, entre ellas que no se ve ninguna nota antes de publicar y que cada estudiante ve solo lo suyo | Una prueba creaba un segundo estudiante con el mismo correo por defecto y falló; se le dio otro correo | Aprobó el tablero del docente al verlo en Render y pidió uno para el estudiante |
 | 2026-11-19 | Proyecto, equipo y bitácora pública | Claude Code con Claude Opus 5.5 | Revisar una observación externa que decía que faltaban la página del equipo y las rutas `/api/proyecto` y `/api/bitacora`, y construirlas (RF-18, RF-22) | Confirmó contra el SRS que la observación era cierta: las dos rutas estaban en la tabla desde el contrato pero nunca se hicieron. Páginas públicas de proyecto, equipo y bitácora; la bitácora se lee del mismo `docs/bitacora-ia.md`; matriz de trazabilidad al día (D-26) | Antes, el tablero del estudiante falló en el CI porque solo se corrieron las pruebas tocadas y no la del contrato, que vigila los campos "nota"; desde ahí se corre la suite completa antes de subir | Pidió verificar la observación antes de aceptarla y un guion para presentarle el proyecto al profesor. Los roles y aportes de Santiago y Jerónimo quedan con `[…]` para que ellos los escriban |
+| 2026-11-19 | Administración: IA, costos y auditoría | Claude Code con Claude Opus 5.5 | Revisar una segunda observación externa y hacer lo que sí faltaba: pantallas del administrador para el modelo de IA, los costos y la auditoría (RF-19, RF-20, RF-15), y la reflexión final de la bitácora | Mostró que dos de los cuatro puntos ya estaban hechos (la observación miraba una versión vieja del repositorio) y que los otros dos eran ciertos. Pestañas en `/admin`: cambiar proveedor y modelo, probar la conexión, costos por evaluación y registro de auditoría; reflexión final redactada con ejemplos de esta bitácora | El backend de estas tres secciones existía desde el módulo del evaluador, pero nadie había hecho su pantalla: RF-19 es obligatorio y solo se podía usar por la API | Pidió hacer los dos puntos que sí faltaban en un solo PR. El costo de evaluar los laboratorios reales queda por completar con el dato del panel de costos en producción |
 
 ## Reflexión final
 
-Responder al cerrar el proyecto, con ejemplos reales de esta bitácora:
+Con ejemplos reales de esta bitácora.
 
-- ¿Qué parte hizo mejor la IA y cuál tuvieron que corregir más?
-- ¿Qué hallazgo de los revisores evitó un error serio?
-- ¿Qué decisión técnica tomaron ustedes en contra de lo que propuso la IA, y por qué?
-- ¿Cuánto costó en tokens evaluar los laboratorios reales?
+**¿Qué parte hizo mejor la IA y cuál tuvimos que corregir más?**
+Lo mejor fue el backend con sus pruebas: el contrato de datos, el cálculo de la nota, el sandbox
+y el evaluador salieron con cientos de pruebas desde el primer día, y al cierre la suite tiene
+más de 1.200. También fue muy buena convirtiendo nuestras decisiones en documentación (SRS,
+decisiones y esta bitácora). Lo que más corregimos fueron sus supuestos sobre el entorno:
+propuso Hugging Face Spaces cuando Docker ya era de pago allí, supuso Python 3.12, creyó que no
+teníamos acceso a Mythos y usó una versión de Vite que no corre con el Node de nuestro PC. Y
+varias primeras versiones tenían huecos que solo salieron con los revisores o con el CI (por
+ejemplo, el tablero del estudiante rompió la prueba del contrato que vigila los campos "nota").
+
+**¿Qué hallazgo de los revisores evitó un error serio?**
+En el módulo del contrato, el revisor de seguridad encontró que la dirección del proveedor de IA
+aceptaba cualquier servidor. Con eso, alguien con acceso de administrador podía apuntar la app a
+un servidor propio y el backend le habría enviado la llave de OpenAI. Desde entonces la dirección
+es fija para OpenAI y OpenRouter, y Ollama solo acepta los equipos de una lista. En el mismo
+módulo también se cerró `/openapi.json`, que dejaba ver todas las rutas.
+
+**¿Qué decisión técnica tomamos en contra de lo que propuso la IA, y por qué?**
+Cuando la IA supuso que el equipo no tenía acceso a Mythos y propuso hacer todo con Fable 5.2,
+lo corregimos: sí teníamos acceso, y lo usamos en lo crítico (contrato, evaluador, sandbox y
+login), dejando Fable como plan B. También verificamos cada plan gratuito que propuso antes de
+aceptarlo, y así cambiamos Hugging Face por Render. Y al cierre, antes de aceptar una observación
+externa sobre lo que faltaba, la comprobamos contra el SRS: era cierta en parte, y solo hicimos
+lo que de verdad faltaba.
+
+**¿Cuánto costó en tokens evaluar los laboratorios reales?**
+(completar con el panel de Costos en `/admin/costos`, después de evaluar los laboratorios reales
+en producción: tokens de entrada, tokens de salida y costo en dólares, total y por evaluación).
