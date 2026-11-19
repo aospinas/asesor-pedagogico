@@ -6,7 +6,7 @@ Plataforma web que evalúa laboratorios de IA de las cohortes 1 y 2.
 Proyecto final de Profundización I - Inteligencia Artificial, Universidad de Manizales.
 Equipo: Andrés Ospina Silva, Santiago Arias Aguirre y Jerónimo Aristizabal.
 
-Flujo: Claude Code sube cada módulo en una rama y abre un PR; Andrés hace el merge en GitHub.
+
 
 ## Cómo está organizado
 
