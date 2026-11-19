@@ -11,6 +11,7 @@ import Entregas from "./paginas/Entregas";
 import Informe from "./paginas/Informe";
 import Inicio from "./paginas/Inicio";
 import Mapa from "./paginas/Mapa";
+import MiTablero from "./paginas/MiTablero";
 import Publicada from "./paginas/Publicada";
 import Revision from "./paginas/Revision";
 import Tablero from "./paginas/Tablero";
@@ -18,6 +19,7 @@ import Tablero from "./paginas/Tablero";
 /** Qué ve cada rol en el menú (el backend vuelve a revisar el rol en cada ruta). */
 const MENU: Record<Rol, { a: string; texto: string }[]> = {
   estudiante: [
+    { a: "/mi-tablero", texto: "Mi tablero" },
     { a: "/entregas", texto: "Mis entregas" },
     { a: "/informe", texto: "Mi informe" },
     { a: "/mapa", texto: "Mapa mental" },
@@ -89,6 +91,7 @@ export default function App() {
               path="/clave"
               element={sesion ? <Clave sesion={sesion} alCambiar={setSesion} /> : <Navigate to="/" />}
             />
+            <Route path="/mi-tablero" element={solo("estudiante", <MiTablero nombre={sesion?.usuario.nombre ?? ""} />)} />
             <Route path="/entregas" element={solo("estudiante", <Entregas />)} />
             <Route path="/informe" element={solo("estudiante", <Informe estudianteId={sesion?.usuario.id ?? ""} />)} />
             <Route path="/mapa" element={solo("estudiante", <Mapa estudianteId={sesion?.usuario.id ?? ""} />)} />

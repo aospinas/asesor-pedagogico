@@ -447,3 +447,9 @@ El módulo se hizo con **Opus 5.5**: Mythos 5.2 y Fable 5.2 no tenían créditos
 - **Pantalla principal del docente** (`/tablero`, ruta `GET /api/tablero`, solo docente). Todos los números los calcula el backend (`app/informes/tablero.py`) con datos reales; la IA no participa.
 - **Qué muestra:** estudiantes, laboratorios y entregas; en qué paso va cada entrega (cada una cuenta con su evaluación más reciente); promedio y niveles de las notas publicadas; promedio por laboratorio; los cinco criterios con menor dominio (nivel final llevado a 0-5 con la versión de rúbrica evaluada, solo aprobadas y publicadas); el acuerdo entre la IA y el docente (en cuántos criterios el docente dejó el nivel propuesto), y las alertas que esperan revisión (inyección, citas no encontradas, revisión manual).
 - **Rúbrica de ejemplo:** `docs/ejemplos/rubrica_lab01.json` y `.txt`, con los diez criterios de la guía del Lab 01 (100 puntos), para la demo.
+
+## D-25: Tablero del estudiante (19-nov-2026)
+
+- **Pantalla principal del estudiante** (`/mi-tablero`, ruta `GET /api/mi-tablero`, solo estudiante). La ruta no recibe id: siempre es el tablero del usuario de la sesión, así nadie puede pedir el de otro.
+- **Solo lo publicado (RNF-09):** promedio, nivel, última nota (y si subió o bajó frente a la anterior), y los tres criterios más fuertes y los tres por mejorar salen solo de evaluaciones publicadas (`calculo.publicadas_de`). De lo que no se ha publicado, el estudiante solo ve cuántos laboratorios esperan al docente, nunca una nota.
+- También muestra los laboratorios que le faltan por entregar y el cerro de Cordillera con la altura de su promedio (2.150 m a 5.321 m).

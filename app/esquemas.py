@@ -733,6 +733,42 @@ class AlertasTablero(Estricto):
     revision_manual: int
 
 
+class LaboratorioPendiente(Estricto):
+    laboratorio_id: UUID
+    titulo: str
+
+
+class UltimaNota(Estricto):
+    evaluacion_id: UUID
+    titulo: str
+    nota: float = Field(ge=NOTA_MINIMA, le=NOTA_MAXIMA, allow_inf_nan=False)
+    nivel: NivelDominio
+    fecha: datetime
+    cambio: float | None  # contra la publicada anterior; None si es la primera
+
+
+class CriterioEstudiante(Estricto):
+    laboratorio: str
+    criterio: str
+    promedio: float
+    nivel: NivelDominio
+
+
+class MiTablero(Estricto):
+    """Tablero del estudiante (D-25). Solo cuenta lo publicado (RNF-09)."""
+
+    laboratorios: int
+    pendientes: list[LaboratorioPendiente]
+    entregados: int
+    esperando: int  # laboratorios entregados que aún no tienen evaluación publicada
+    publicados: int
+    promedio: float | None
+    nivel: NivelDominio | None
+    ultima: UltimaNota | None
+    fortalezas: list[CriterioEstudiante]
+    por_mejorar: list[CriterioEstudiante]
+
+
 class Tablero(Estricto):
     resumen: ResumenTablero
     niveles: list[NivelCantidad]

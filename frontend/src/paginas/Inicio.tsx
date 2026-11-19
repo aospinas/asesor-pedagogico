@@ -3,7 +3,7 @@ import { Navigate } from "react-router-dom";
 import { ErrorApi, api, enviarJson, type Sesion } from "../api";
 import { Curvas } from "../componentes";
 
-const DESTINO = { estudiante: "/entregas", docente: "/tablero", administrador: "/admin" } as const;
+const DESTINO = { estudiante: "/mi-tablero", docente: "/tablero", administrador: "/admin" } as const;
 
 export default function Inicio({ sesion, alEntrar }: { sesion: Sesion | null; alEntrar: (s: Sesion) => void }) {
   const [correo, setCorreo] = useState("");

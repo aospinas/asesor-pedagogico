@@ -194,6 +194,27 @@ export type Tablero = {
   generado: string;
 };
 
+export type CriterioEstudiante = { laboratorio: string; criterio: string; promedio: number; nivel: NivelDominio };
+export type MiTablero = {
+  laboratorios: number;
+  pendientes: { laboratorio_id: string; titulo: string }[];
+  entregados: number;
+  esperando: number;
+  publicados: number;
+  promedio: number | null;
+  nivel: NivelDominio | null;
+  ultima: {
+    evaluacion_id: string;
+    titulo: string;
+    nota: number;
+    nivel: NivelDominio;
+    fecha: string;
+    cambio: number | null;
+  } | null;
+  fortalezas: CriterioEstudiante[];
+  por_mejorar: CriterioEstudiante[];
+};
+
 export type NodoMapa = {
   id: string;
   tipo: "categoria" | "tema" | "laboratorio";
