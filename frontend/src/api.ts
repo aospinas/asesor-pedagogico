@@ -166,6 +166,34 @@ export type Informe = {
   generado: string;
 };
 
+export type Tablero = {
+  resumen: {
+    estudiantes: number;
+    laboratorios: number;
+    entregas: number;
+    sin_evaluar: number;
+    en_proceso: number;
+    por_revisar: number;
+    aprobadas: number;
+    publicadas: number;
+    promedio: number | null;
+  };
+  niveles: { nivel: NivelDominio; cantidad: number }[];
+  laboratorios: {
+    laboratorio_id: string;
+    titulo: string;
+    entregas: number;
+    evaluadas: number;
+    publicadas: number;
+    promedio: number | null;
+    nivel: NivelDominio | null;
+  }[];
+  criterios_debiles: { laboratorio: string; criterio: string; promedio: number; nivel: NivelDominio; evaluaciones: number }[];
+  acuerdo: { criterios: number; iguales: number; cambiados: number; porcentaje: number | null };
+  alertas: { inyeccion: number; citas_no_encontradas: number; revision_manual: number };
+  generado: string;
+};
+
 export type NodoMapa = {
   id: string;
   tipo: "categoria" | "tema" | "laboratorio";

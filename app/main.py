@@ -29,6 +29,7 @@ from app.api import (
     revision,
     rubricas,
     sesion,
+    tablero,
     usuarios,
 )
 from app.api.seguridad import limitador, tiene_sesion_firmada
@@ -224,6 +225,7 @@ app.include_router(evaluaciones.router)
 app.include_router(revision.router)
 app.include_router(informe.router)
 app.include_router(config_ia.router)
+app.include_router(tablero.router)
 
 # Pantallas del frontend (React): todas caen en index.html; React decide qué mostrar.
 # "laboratorios", "admin" y "equipo" quedan reservadas para los PR 2 y 3 (así no hay que tocar el backend).
@@ -236,6 +238,7 @@ PANTALLAS = {
     "mapa",
     "bandeja",
     "revision",
+    "tablero",
     "laboratorios",
     "admin",
     "equipo",

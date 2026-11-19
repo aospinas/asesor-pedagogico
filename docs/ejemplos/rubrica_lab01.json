@@ -1,0 +1,325 @@
+{
+  "laboratorio": "Lab 01 — Manizales Resiliente: diseño de soluciones digitales inteligentes para gestión post-terremoto",
+  "criterios": [
+    {
+      "id": "problema",
+      "nombre": "Formulación del problema y valor",
+      "competencia": "Formulación de problemas",
+      "peso": 10,
+      "niveles": [
+        {
+          "id": "excelente",
+          "nombre": "Excelente",
+          "descriptor": "Problema descrito sin mencionar tecnología, verificable, con indicadores medibles, entradas, salidas, restricciones, condiciones de éxito, impacto del error y Problem Canvas completo.",
+          "valor": 5
+        },
+        {
+          "id": "bueno",
+          "nombre": "Bueno",
+          "descriptor": "Problema claro y sin tecnología, con indicadores y Problem Canvas, pero falta alguno de: restricciones, condiciones de éxito o impacto del error.",
+          "valor": 4
+        },
+        {
+          "id": "aceptable",
+          "nombre": "Aceptable",
+          "descriptor": "Problema entendible pero mezclado con la solución tecnológica o sin indicadores medibles; Problem Canvas incompleto.",
+          "valor": 3
+        },
+        {
+          "id": "insuficiente",
+          "nombre": "Insuficiente",
+          "descriptor": "El problema no se distingue de la solución o no tiene Problem Canvas.",
+          "valor": 1
+        }
+      ]
+    },
+    {
+      "id": "capacidades_ia",
+      "nombre": "Comprensión inicial de IA, ML, Visión, PLN, Voz y Robótica",
+      "competencia": "Fundamentos de IA",
+      "peso": 15,
+      "niveles": [
+        {
+          "id": "excelente",
+          "nombre": "Excelente",
+          "descriptor": "Responde las siete preguntas obligatorias para cada capacidad, dice qué hace la IA y qué no, y se apoya en las lecturas de la clase.",
+          "valor": 5
+        },
+        {
+          "id": "bueno",
+          "nombre": "Bueno",
+          "descriptor": "Responde las preguntas para casi todas las capacidades con buen criterio, pero alguna queda superficial o sin apoyo en las lecturas.",
+          "valor": 4
+        },
+        {
+          "id": "aceptable",
+          "nombre": "Aceptable",
+          "descriptor": "Describe las capacidades de forma general, sin las siete preguntas o sin separar lo que hace la IA de lo que hace el software corriente.",
+          "valor": 3
+        },
+        {
+          "id": "insuficiente",
+          "nombre": "Insuficiente",
+          "descriptor": "No muestra comprensión de las capacidades o las confunde entre sí.",
+          "valor": 1
+        }
+      ]
+    },
+    {
+      "id": "tecnologia",
+      "nombre": "Selección tecnológica y trade-offs",
+      "competencia": "Diseño de soluciones",
+      "peso": 12,
+      "niveles": [
+        {
+          "id": "excelente",
+          "nombre": "Excelente",
+          "descriptor": "Cada tecnología dice qué hace, dónde se integra, por qué se eligió y qué alternativa se descartó; incluye descartes razonados.",
+          "valor": 5
+        },
+        {
+          "id": "bueno",
+          "nombre": "Bueno",
+          "descriptor": "Justifica la mayoría de tecnologías y presenta descartes, pero algunos sin razón clara.",
+          "valor": 4
+        },
+        {
+          "id": "aceptable",
+          "nombre": "Aceptable",
+          "descriptor": "Lista tecnologías con poca justificación y sin comparar alternativas.",
+          "valor": 3
+        },
+        {
+          "id": "insuficiente",
+          "nombre": "Insuficiente",
+          "descriptor": "Solo enumera herramientas, sin justificar ni descartar nada.",
+          "valor": 1
+        }
+      ]
+    },
+    {
+      "id": "arquitectura",
+      "nombre": "Arquitectura conceptual",
+      "competencia": "Diseño de soluciones",
+      "peso": 15,
+      "niveles": [
+        {
+          "id": "excelente",
+          "nombre": "Excelente",
+          "descriptor": "Diagrama completo, verificación paso a paso del contrato mínimo y recorrido de un caso de punta a punta; la IA aparece aislada y con modo degradado.",
+          "valor": 5
+        },
+        {
+          "id": "bueno",
+          "nombre": "Bueno",
+          "descriptor": "Diagrama claro con el recorrido principal, pero falta verificar alguna parte del contrato mínimo.",
+          "valor": 4
+        },
+        {
+          "id": "aceptable",
+          "nombre": "Aceptable",
+          "descriptor": "Diagrama general sin recorrido de un caso ni explicación de cómo se conectan las piezas.",
+          "valor": 3
+        },
+        {
+          "id": "insuficiente",
+          "nombre": "Insuficiente",
+          "descriptor": "No hay arquitectura o es solo una lista de componentes.",
+          "valor": 1
+        }
+      ]
+    },
+    {
+      "id": "aplicacion",
+      "nombre": "Diseño de aplicación moderna",
+      "competencia": "Ingeniería de software",
+      "peso": 10,
+      "niveles": [
+        {
+          "id": "excelente",
+          "nombre": "Excelente",
+          "descriptor": "Cubre los once elementos de la Misión 07: roles y permisos, endpoints, integraciones, persistencia, datos geográficos, eventos, operación sin conexión, observabilidad, seguridad, aislamiento de la IA y control humano.",
+          "valor": 5
+        },
+        {
+          "id": "bueno",
+          "nombre": "Bueno",
+          "descriptor": "Cubre la mayoría de los once elementos con detalle suficiente.",
+          "valor": 4
+        },
+        {
+          "id": "aceptable",
+          "nombre": "Aceptable",
+          "descriptor": "Cubre menos de la mitad de los elementos o los menciona sin detalle.",
+          "valor": 3
+        },
+        {
+          "id": "insuficiente",
+          "nombre": "Insuficiente",
+          "descriptor": "No describe cómo sería la aplicación.",
+          "valor": 1
+        }
+      ]
+    },
+    {
+      "id": "datos",
+      "nombre": "Datos y trazabilidad",
+      "competencia": "Gestión de datos",
+      "peso": 8,
+      "niveles": [
+        {
+          "id": "excelente",
+          "nombre": "Excelente",
+          "descriptor": "Data Map con estados diferenciados, calidad, riesgo, uso y datos personales clasificados; explica cómo se rastrea cada decisión.",
+          "valor": 5
+        },
+        {
+          "id": "bueno",
+          "nombre": "Bueno",
+          "descriptor": "Data Map completo pero con poca trazabilidad o sin clasificar los datos personales.",
+          "valor": 4
+        },
+        {
+          "id": "aceptable",
+          "nombre": "Aceptable",
+          "descriptor": "Data Map parcial, sin calidad ni riesgos.",
+          "valor": 3
+        },
+        {
+          "id": "insuficiente",
+          "nombre": "Insuficiente",
+          "descriptor": "No hay Data Map ni trazabilidad.",
+          "valor": 1
+        }
+      ]
+    },
+    {
+      "id": "fallos",
+      "nombre": "Riesgos, resiliencia y Failure Injection",
+      "competencia": "Gestión de riesgos",
+      "peso": 10,
+      "niveles": [
+        {
+          "id": "excelente",
+          "nombre": "Excelente",
+          "descriptor": "Analiza al menos cuatro fallos con impacto, detección, modo degradado, recuperación, responsable y forma de probarlo.",
+          "valor": 5
+        },
+        {
+          "id": "bueno",
+          "nombre": "Bueno",
+          "descriptor": "Analiza los fallos mínimos con la mayoría de columnas completas.",
+          "valor": 4
+        },
+        {
+          "id": "aceptable",
+          "nombre": "Aceptable",
+          "descriptor": "Menciona fallos sin decir cómo se detectan, cómo se recupera el sistema o quién responde.",
+          "valor": 3
+        },
+        {
+          "id": "insuficiente",
+          "nombre": "Insuficiente",
+          "descriptor": "No analiza fallos.",
+          "valor": 1
+        }
+      ]
+    },
+    {
+      "id": "quality_gates",
+      "nombre": "Quality Gates y Human-in-the-Loop",
+      "competencia": "IA responsable",
+      "peso": 8,
+      "niveles": [
+        {
+          "id": "excelente",
+          "nombre": "Excelente",
+          "descriptor": "Dice qué nunca se automatiza, el nivel de autonomía por acción, los Quality Gates y cada riesgo cruzado con su Quality Gate.",
+          "valor": 5
+        },
+        {
+          "id": "bueno",
+          "nombre": "Bueno",
+          "descriptor": "Define Quality Gates y control humano, pero sin cruzarlos con los riesgos.",
+          "valor": 4
+        },
+        {
+          "id": "aceptable",
+          "nombre": "Aceptable",
+          "descriptor": "Menciona la revisión humana de forma general, sin Quality Gates concretos.",
+          "valor": 3
+        },
+        {
+          "id": "insuficiente",
+          "nombre": "Insuficiente",
+          "descriptor": "La IA decide sola o no hay control humano.",
+          "valor": 1
+        }
+      ]
+    },
+    {
+      "id": "uso_responsable",
+      "nombre": "Uso responsable de IA y Banco de Prompts",
+      "competencia": "IA responsable",
+      "peso": 7,
+      "niveles": [
+        {
+          "id": "excelente",
+          "nombre": "Excelente",
+          "descriptor": "Banco de prompts desde el inicio con las columnas de la guía, incluye prompts rechazados y una declaración de uso responsable completa.",
+          "valor": 5
+        },
+        {
+          "id": "bueno",
+          "nombre": "Bueno",
+          "descriptor": "Banco de prompts completo y declaración, pero sin prompts rechazados o con pocos registros.",
+          "valor": 4
+        },
+        {
+          "id": "aceptable",
+          "nombre": "Aceptable",
+          "descriptor": "Banco de prompts con pocos registros o declaración genérica.",
+          "valor": 3
+        },
+        {
+          "id": "insuficiente",
+          "nombre": "Insuficiente",
+          "descriptor": "No hay banco de prompts ni declaración.",
+          "valor": 1
+        }
+      ]
+    },
+    {
+      "id": "prototipo",
+      "nombre": "Prototipo y defensa técnica",
+      "competencia": "Comunicación técnica",
+      "peso": 5,
+      "niveles": [
+        {
+          "id": "excelente",
+          "nombre": "Excelente",
+          "descriptor": "Prototipo navegable con lo simulado rotulado y respuestas claras a las preguntas de defensa.",
+          "valor": 5
+        },
+        {
+          "id": "bueno",
+          "nombre": "Bueno",
+          "descriptor": "Prototipo funcional y defensa con respuestas a la mayoría de preguntas.",
+          "valor": 4
+        },
+        {
+          "id": "aceptable",
+          "nombre": "Aceptable",
+          "descriptor": "Prototipo incompleto o defensa con respuestas vagas.",
+          "valor": 3
+        },
+        {
+          "id": "insuficiente",
+          "nombre": "Insuficiente",
+          "descriptor": "No hay prototipo ni defensa.",
+          "valor": 1
+        }
+      ]
+    }
+  ]
+}

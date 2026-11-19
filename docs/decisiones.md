@@ -441,3 +441,9 @@ El módulo se hizo con **Opus 5.5**: Mythos 5.2 y Fable 5.2 no tenían créditos
 - **Revisión:** el enlace de la bandeja pasa `?laboratorio=` para cargar la versión de rúbrica evaluada y mostrar también los criterios que la IA no alcanzó a proponer.
 - **Pantallas reservadas** para los PR 2 y 3: `laboratorios`, `admin` y `equipo`.
 - **Seguridad:** todo texto se muestra como texto (React lo escapa y Cytoscape dibuja en canvas); no se usa `dangerouslySetInnerHTML` ni se guardan tokens en el navegador.
+
+## D-24: Tablero del docente (19-nov-2026)
+
+- **Pantalla principal del docente** (`/tablero`, ruta `GET /api/tablero`, solo docente). Todos los números los calcula el backend (`app/informes/tablero.py`) con datos reales; la IA no participa.
+- **Qué muestra:** estudiantes, laboratorios y entregas; en qué paso va cada entrega (cada una cuenta con su evaluación más reciente); promedio y niveles de las notas publicadas; promedio por laboratorio; los cinco criterios con menor dominio (nivel final llevado a 0-5 con la versión de rúbrica evaluada, solo aprobadas y publicadas); el acuerdo entre la IA y el docente (en cuántos criterios el docente dejó el nivel propuesto), y las alertas que esperan revisión (inyección, citas no encontradas, revisión manual).
+- **Rúbrica de ejemplo:** `docs/ejemplos/rubrica_lab01.json` y `.txt`, con los diez criterios de la guía del Lab 01 (100 puntos), para la demo.

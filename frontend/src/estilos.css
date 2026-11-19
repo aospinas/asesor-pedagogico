@@ -132,6 +132,15 @@ th { color: var(--texto-2); font-weight: 600; font-size: 0.9rem; background: var
 .barra-dominio .relleno { height: 100%; background: var(--verde); border-radius: 999px; transform-origin: left; animation: crecer 500ms ease-out; }
 @keyframes crecer { from { transform: scaleX(0); } to { transform: scaleX(1); } }
 
+/* Tablero del docente */
+.cifras { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); margin: 16px 0; }
+.cifra-tarjeta { margin: 0; }
+.numero { font-family: var(--titulo); font-weight: 800; font-stretch: 112%; font-size: 2.2rem; line-height: 1.1; color: var(--verde); }
+.flujo { display: flex; height: 22px; border: 1px solid var(--borde); border-radius: 999px; overflow: hidden; background: #fff; }
+.flujo > div { min-width: 6px; }
+.leyenda { display: flex; flex-wrap: wrap; gap: 6px 18px; list-style: none; padding: 0; margin: 10px 0; }
+.leyenda .muestra { display: inline-block; width: 12px; height: 12px; border: 1px solid var(--borde-campo); border-radius: 3px; vertical-align: -1px; }
+
 /* Mapa mental */
 .mapa-lienzo { height: min(70vh, 620px); background: var(--superficie); border: 1px solid var(--borde); border-radius: 10px; position: relative; overflow: hidden; }
 .mapa-lienzo .cy { position: absolute; inset: 0; }
