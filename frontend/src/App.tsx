@@ -4,6 +4,7 @@ import { api, type Rol, type Sesion } from "./api";
 import { Curvas } from "./componentes";
 import Admin from "./paginas/Admin";
 import Bandeja from "./paginas/Bandeja";
+import Bitacora from "./paginas/Bitacora";
 import Laboratorio from "./paginas/Laboratorio";
 import Laboratorios from "./paginas/Laboratorios";
 import Clave from "./paginas/Clave";
@@ -12,6 +13,7 @@ import Informe from "./paginas/Informe";
 import Inicio from "./paginas/Inicio";
 import Mapa from "./paginas/Mapa";
 import MiTablero from "./paginas/MiTablero";
+import Proyecto from "./paginas/Proyecto";
 import Publicada from "./paginas/Publicada";
 import Revision from "./paginas/Revision";
 import Tablero from "./paginas/Tablero";
@@ -62,23 +64,36 @@ export default function App() {
           <p className="marca">
             Asesor pedagógico <span>inteligente</span>
           </p>
-          {sesion && (
-            <nav aria-label="Menú principal">
-              {!clave &&
-                rol &&
-                MENU[rol].map((m) => (
-                  <NavLink key={m.a} to={m.a} className={({ isActive }) => (isActive ? "activo" : "")}>
-                    {m.texto}
-                  </NavLink>
-                ))}
-              <NavLink to="/clave" className={({ isActive }) => (isActive ? "activo" : "")}>
-                Contraseña
+          <nav aria-label="Menú principal">
+            {sesion &&
+              !clave &&
+              rol &&
+              MENU[rol].map((m) => (
+                <NavLink key={m.a} to={m.a} className={({ isActive }) => (isActive ? "activo" : "")}>
+                  {m.texto}
+                </NavLink>
+              ))}
+            <NavLink to="/proyecto" className={({ isActive }) => (isActive ? "activo" : "")}>
+              Proyecto
+            </NavLink>
+            <NavLink to="/bitacora" className={({ isActive }) => (isActive ? "activo" : "")}>
+              Bitácora IA
+            </NavLink>
+            {sesion ? (
+              <>
+                <NavLink to="/clave" className={({ isActive }) => (isActive ? "activo" : "")}>
+                  Contraseña
+                </NavLink>
+                <button type="button" onClick={salir}>
+                  Salir ({sesion.usuario.nombre})
+                </button>
+              </>
+            ) : (
+              <NavLink to="/" end className={({ isActive }) => (isActive ? "activo" : "")}>
+                Entrar
               </NavLink>
-              <button type="button" onClick={salir}>
-                Salir ({sesion.usuario.nombre})
-              </button>
-            </nav>
-          )}
+            )}
+          </nav>
         </div>
       </header>
       <main className="pagina">
@@ -102,6 +117,9 @@ export default function App() {
             <Route path="/laboratorios" element={solo("docente", <Laboratorios />)} />
             <Route path="/laboratorios/:id" element={solo("docente", <Laboratorio />)} />
             <Route path="/admin" element={solo("administrador", <Admin yo={sesion?.usuario.id ?? ""} />)} />
+            <Route path="/proyecto" element={<Proyecto />} />
+            <Route path="/equipo" element={<Proyecto />} />
+            <Route path="/bitacora" element={<Bitacora />} />
             <Route path="*" element={<Navigate to="/" />} />
           </Routes>
         )}

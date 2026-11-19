@@ -194,6 +194,25 @@ export type Tablero = {
   generado: string;
 };
 
+export type Proyecto = {
+  nombre: string;
+  abstract: string;
+  regla: string;
+  tecnologias: { nombre: string; para_que: string }[];
+  aportes: string[];
+  equipo: { nombre: string; rol: string; aporte: string; foto_url: string | null }[];
+  repositorio: string;
+};
+export type FilaBitacora = {
+  fecha: string;
+  fase: string;
+  herramienta: string;
+  pedido: string;
+  aporte: string;
+  problema: string;
+  decision: string;
+};
+
 export type CriterioEstudiante = { laboratorio: string; criterio: string; promedio: number; nivel: NivelDominio };
 export type MiTablero = {
   laboratorios: number;

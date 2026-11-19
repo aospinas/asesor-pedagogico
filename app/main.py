@@ -26,6 +26,7 @@ from app.api import (
     informe,
     laboratorios,
     portafolio,
+    proyecto,
     revision,
     rubricas,
     sesion,
@@ -226,6 +227,7 @@ app.include_router(revision.router)
 app.include_router(informe.router)
 app.include_router(config_ia.router)
 app.include_router(tablero.router)
+app.include_router(proyecto.router)
 
 # Pantallas del frontend (React): todas caen en index.html; React decide qué mostrar.
 # "laboratorios", "admin" y "equipo" quedan reservadas para los PR 2 y 3 (así no hay que tocar el backend).
@@ -240,6 +242,8 @@ PANTALLAS = {
     "revision",
     "tablero",
     "mi-tablero",
+    "proyecto",
+    "bitacora",
     "laboratorios",
     "admin",
     "equipo",

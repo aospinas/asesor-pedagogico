@@ -28,6 +28,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY app ./app
 COPY prompts ./prompts
+# La bitácora de IA se publica en /api/bitacora (RF-22, D-26)
+COPY docs/bitacora-ia.md ./docs/bitacora-ia.md
 COPY --from=web /web/dist ./frontend/dist
 COPY alembic.ini .
 COPY migraciones ./migraciones
