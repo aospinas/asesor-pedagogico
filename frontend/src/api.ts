@@ -194,6 +194,47 @@ export type Tablero = {
   generado: string;
 };
 
+export type Proveedor = "openai" | "ollama" | "openrouter";
+export type ConfigIAVista = {
+  proveedor: Proveedor;
+  modelo: string;
+  base_url: string;
+  origen: "base" | "entorno" | "sin_configurar";
+  llave_configurada: boolean;
+  precio_entrada_usd: number;
+  precio_salida_usd: number;
+  fecha: string | null;
+};
+export type PruebaConexion = { ok: boolean; proveedor: Proveedor; modelo: string; mensaje: string };
+export type Costos = {
+  tokens_entrada: number;
+  tokens_salida: number;
+  costo_usd: number;
+  evaluaciones: {
+    evaluacion_id: string;
+    entrega_id: string;
+    fecha: string;
+    proveedor: Proveedor;
+    modelo: string;
+    tokens_entrada: number;
+    tokens_salida: number;
+    costo_usd: number;
+  }[];
+  planes_tokens_entrada: number;
+  planes_tokens_salida: number;
+  planes_costo_usd: number;
+};
+export type RegistroAuditoria = {
+  id: string;
+  usuario_id: string | null;
+  accion: string;
+  entidad: string;
+  entidad_id: string | null;
+  detalle: Record<string, unknown>;
+  ip: string | null;
+  fecha: string;
+};
+
 export type Proyecto = {
   nombre: string;
   abstract: string;

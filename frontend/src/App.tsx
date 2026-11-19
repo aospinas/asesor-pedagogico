@@ -31,7 +31,7 @@ const MENU: Record<Rol, { a: string; texto: string }[]> = {
     { a: "/laboratorios", texto: "Laboratorios" },
     { a: "/bandeja", texto: "Bandeja" },
   ],
-  administrador: [{ a: "/admin", texto: "Usuarios" }],
+  administrador: [{ a: "/admin", texto: "Administración" }],
 };
 
 export default function App() {
@@ -74,7 +74,7 @@ export default function App() {
                 </NavLink>
               ))}
             <NavLink to="/proyecto" className={({ isActive }) => (isActive ? "activo" : "")}>
-              Proyecto
+              Proyecto y equipo
             </NavLink>
             <NavLink to="/bitacora" className={({ isActive }) => (isActive ? "activo" : "")}>
               Bitácora IA
@@ -116,7 +116,13 @@ export default function App() {
             <Route path="/tablero" element={solo("docente", <Tablero />)} />
             <Route path="/laboratorios" element={solo("docente", <Laboratorios />)} />
             <Route path="/laboratorios/:id" element={solo("docente", <Laboratorio />)} />
-            <Route path="/admin" element={solo("administrador", <Admin yo={sesion?.usuario.id ?? ""} />)} />
+            <Route path="/admin" element={solo("administrador", <Admin yo={sesion?.usuario.id ?? ""} seccion="usuarios" />)} />
+            <Route path="/admin/ia" element={solo("administrador", <Admin yo={sesion?.usuario.id ?? ""} seccion="ia" />)} />
+            <Route path="/admin/costos" element={solo("administrador", <Admin yo={sesion?.usuario.id ?? ""} seccion="costos" />)} />
+            <Route
+              path="/admin/auditoria"
+              element={solo("administrador", <Admin yo={sesion?.usuario.id ?? ""} seccion="auditoria" />)}
+            />
             <Route path="/proyecto" element={<Proyecto />} />
             <Route path="/equipo" element={<Proyecto />} />
             <Route path="/bitacora" element={<Bitacora />} />

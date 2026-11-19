@@ -1,11 +1,49 @@
 import { type FormEvent, useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { ErrorApi, api, enviarJson, type Rol, type Usuario } from "../api";
 import { Estado } from "../componentes";
+import Auditoria from "./admin/Auditoria";
+import ConfigIA from "./admin/ConfigIA";
+import Costos from "./admin/Costos";
 
 const ROL: Record<Rol, string> = { estudiante: "Estudiante", docente: "Docente", administrador: "Administrador" };
 const mensaje = (e: unknown) => (e instanceof ErrorApi ? e.message : "No se pudo conectar. Revisa tu internet.");
 
-export default function Admin({ yo }: { yo: string }) {
+export type Seccion = "usuarios" | "ia" | "costos" | "auditoria";
+const PESTANAS: { a: string; seccion: Seccion; texto: string }[] = [
+  { a: "/admin", seccion: "usuarios", texto: "Usuarios" },
+  { a: "/admin/ia", seccion: "ia", texto: "Modelo de IA" },
+  { a: "/admin/costos", seccion: "costos", texto: "Costos" },
+  { a: "/admin/auditoria", seccion: "auditoria", texto: "Auditoría" },
+];
+const TITULO: Record<Seccion, string> = {
+  usuarios: "Usuarios",
+  ia: "Modelo de IA",
+  costos: "Costos de la IA",
+  auditoria: "Auditoría",
+};
+
+/** Administración con pestañas: usuarios (RF-02), IA (RF-19), costos (RF-20) y auditoría (RF-15). */
+export default function Admin({ yo, seccion }: { yo: string; seccion: Seccion }) {
+  return (
+    <>
+      <h1>{TITULO[seccion]}</h1>
+      <nav className="pestanas" aria-label="Secciones de administración">
+        {PESTANAS.map((p) => (
+          <Link key={p.a} to={p.a} className={p.seccion === seccion ? "activa" : ""} aria-current={p.seccion === seccion ? "page" : undefined}>
+            {p.texto}
+          </Link>
+        ))}
+      </nav>
+      {seccion === "usuarios" && <Usuarios yo={yo} />}
+      {seccion === "ia" && <ConfigIA />}
+      {seccion === "costos" && <Costos />}
+      {seccion === "auditoria" && <Auditoria />}
+    </>
+  );
+}
+
+function Usuarios({ yo }: { yo: string }) {
   const [usuarios, setUsuarios] = useState<Usuario[] | null>(null);
   const [error, setError] = useState("");
   const [aviso, setAviso] = useState("");
@@ -64,7 +102,6 @@ export default function Admin({ yo }: { yo: string }) {
 
   return (
     <>
-      <h1>Usuarios</h1>
       {aviso && (
         <p className="aviso" role="status">
           {aviso}
