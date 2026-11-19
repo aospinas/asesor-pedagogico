@@ -43,6 +43,7 @@ MODELOS_CON_NOTA = {
     esquemas.EvaluacionPublicada,
     esquemas.EvaluacionResumen,
     esquemas.ResultadoLaboratorio,
+    esquemas.UltimaNota,  # tablero del estudiante (D-25): copia la nota final ya publicada
 }
 MODELOS_SIN_NOTA = [m for m in MODELOS if m not in MODELOS_CON_NOTA]
 
@@ -68,6 +69,7 @@ def test_los_modelos_con_nota_no_son_de_entrada():
         "EvaluacionPublicada",
         "EvaluacionResumen",
         "ResultadoLaboratorio",
+        "UltimaNota",
     }
 
 
