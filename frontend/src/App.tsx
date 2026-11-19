@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { NavLink, Navigate, Route, Routes, useNavigate } from "react-router-dom";
+import { Link, NavLink, Navigate, Route, Routes, useNavigate } from "react-router-dom";
 import { api, type Rol, type Sesion } from "./api";
 import { Curvas } from "./componentes";
 import Admin from "./paginas/Admin";
@@ -73,12 +73,6 @@ export default function App() {
                   {m.texto}
                 </NavLink>
               ))}
-            <NavLink to="/proyecto" className={({ isActive }) => (isActive ? "activo" : "")}>
-              Proyecto y equipo
-            </NavLink>
-            <NavLink to="/bitacora" className={({ isActive }) => (isActive ? "activo" : "")}>
-              Bitácora IA
-            </NavLink>
             {sesion ? (
               <>
                 <NavLink to="/clave" className={({ isActive }) => (isActive ? "activo" : "")}>
@@ -130,6 +124,14 @@ export default function App() {
           </Routes>
         )}
       </main>
+      {/* Lo público del proyecto (RF-18, RF-22) va aquí abajo, no en el menú de trabajo. */}
+      <footer className="pie">
+        <span>Asesor Pedagógico Inteligente · Profundización I — IA · Universidad de Manizales</span>
+        <nav aria-label="Sobre el proyecto">
+          <Link to="/proyecto">Proyecto y equipo</Link>
+          <Link to="/bitacora">Cómo usamos la IA</Link>
+        </nav>
+      </footer>
     </>
   );
 }
