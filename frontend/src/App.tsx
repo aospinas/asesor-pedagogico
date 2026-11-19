@@ -13,6 +13,7 @@ import Inicio from "./paginas/Inicio";
 import Mapa from "./paginas/Mapa";
 import Publicada from "./paginas/Publicada";
 import Revision from "./paginas/Revision";
+import Tablero from "./paginas/Tablero";
 
 /** Qué ve cada rol en el menú (el backend vuelve a revisar el rol en cada ruta). */
 const MENU: Record<Rol, { a: string; texto: string }[]> = {
@@ -22,6 +23,7 @@ const MENU: Record<Rol, { a: string; texto: string }[]> = {
     { a: "/mapa", texto: "Mapa mental" },
   ],
   docente: [
+    { a: "/tablero", texto: "Tablero" },
     { a: "/laboratorios", texto: "Laboratorios" },
     { a: "/bandeja", texto: "Bandeja" },
   ],
@@ -93,6 +95,7 @@ export default function App() {
             <Route path="/publicada/:id" element={solo("estudiante", <Publicada />)} />
             <Route path="/bandeja" element={solo("docente", <Bandeja />)} />
             <Route path="/revision/:id" element={solo("docente", <Revision />)} />
+            <Route path="/tablero" element={solo("docente", <Tablero />)} />
             <Route path="/laboratorios" element={solo("docente", <Laboratorios />)} />
             <Route path="/laboratorios/:id" element={solo("docente", <Laboratorio />)} />
             <Route path="/admin" element={solo("administrador", <Admin yo={sesion?.usuario.id ?? ""} />)} />

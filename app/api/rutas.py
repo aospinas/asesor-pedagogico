@@ -189,6 +189,7 @@ RUTAS: tuple[Ruta, ...] = (
         solo_dueno=True,
         solo_publicado=True,
     ),
+    _r("GET", "/api/tablero", [D], "Ver el tablero del curso con métricas reales", ["RF-14", "RF-16"]),
     # --- Configuración de IA, costos y auditoría ---
     _r("GET", "/api/config-ia", [A], "Ver el proveedor y el modelo de IA", ["RF-19"]),
     _r("PUT", "/api/config-ia", [A], "Cambiar el proveedor y el modelo de IA", ["RF-19"]),

@@ -1,0 +1,63 @@
+RÚBRICA — Lab 01 — Manizales Resiliente: diseño de soluciones digitales inteligentes para gestión post-terremoto
+
+Niveles: Excelente (5), Bueno (4), Aceptable (3), Insuficiente (1).
+
+1. Formulación del problema y valor — 10 puntos (competencia: Formulación de problemas)
+   - Excelente (5): Problema descrito sin mencionar tecnología, verificable, con indicadores medibles, entradas, salidas, restricciones, condiciones de éxito, impacto del error y Problem Canvas completo.
+   - Bueno (4): Problema claro y sin tecnología, con indicadores y Problem Canvas, pero falta alguno de: restricciones, condiciones de éxito o impacto del error.
+   - Aceptable (3): Problema entendible pero mezclado con la solución tecnológica o sin indicadores medibles; Problem Canvas incompleto.
+   - Insuficiente (1): El problema no se distingue de la solución o no tiene Problem Canvas.
+
+2. Comprensión inicial de IA, ML, Visión, PLN, Voz y Robótica — 15 puntos (competencia: Fundamentos de IA)
+   - Excelente (5): Responde las siete preguntas obligatorias para cada capacidad, dice qué hace la IA y qué no, y se apoya en las lecturas de la clase.
+   - Bueno (4): Responde las preguntas para casi todas las capacidades con buen criterio, pero alguna queda superficial o sin apoyo en las lecturas.
+   - Aceptable (3): Describe las capacidades de forma general, sin las siete preguntas o sin separar lo que hace la IA de lo que hace el software corriente.
+   - Insuficiente (1): No muestra comprensión de las capacidades o las confunde entre sí.
+
+3. Selección tecnológica y trade-offs — 12 puntos (competencia: Diseño de soluciones)
+   - Excelente (5): Cada tecnología dice qué hace, dónde se integra, por qué se eligió y qué alternativa se descartó; incluye descartes razonados.
+   - Bueno (4): Justifica la mayoría de tecnologías y presenta descartes, pero algunos sin razón clara.
+   - Aceptable (3): Lista tecnologías con poca justificación y sin comparar alternativas.
+   - Insuficiente (1): Solo enumera herramientas, sin justificar ni descartar nada.
+
+4. Arquitectura conceptual — 15 puntos (competencia: Diseño de soluciones)
+   - Excelente (5): Diagrama completo, verificación paso a paso del contrato mínimo y recorrido de un caso de punta a punta; la IA aparece aislada y con modo degradado.
+   - Bueno (4): Diagrama claro con el recorrido principal, pero falta verificar alguna parte del contrato mínimo.
+   - Aceptable (3): Diagrama general sin recorrido de un caso ni explicación de cómo se conectan las piezas.
+   - Insuficiente (1): No hay arquitectura o es solo una lista de componentes.
+
+5. Diseño de aplicación moderna — 10 puntos (competencia: Ingeniería de software)
+   - Excelente (5): Cubre los once elementos de la Misión 07: roles y permisos, endpoints, integraciones, persistencia, datos geográficos, eventos, operación sin conexión, observabilidad, seguridad, aislamiento de la IA y control humano.
+   - Bueno (4): Cubre la mayoría de los once elementos con detalle suficiente.
+   - Aceptable (3): Cubre menos de la mitad de los elementos o los menciona sin detalle.
+   - Insuficiente (1): No describe cómo sería la aplicación.
+
+6. Datos y trazabilidad — 8 puntos (competencia: Gestión de datos)
+   - Excelente (5): Data Map con estados diferenciados, calidad, riesgo, uso y datos personales clasificados; explica cómo se rastrea cada decisión.
+   - Bueno (4): Data Map completo pero con poca trazabilidad o sin clasificar los datos personales.
+   - Aceptable (3): Data Map parcial, sin calidad ni riesgos.
+   - Insuficiente (1): No hay Data Map ni trazabilidad.
+
+7. Riesgos, resiliencia y Failure Injection — 10 puntos (competencia: Gestión de riesgos)
+   - Excelente (5): Analiza al menos cuatro fallos con impacto, detección, modo degradado, recuperación, responsable y forma de probarlo.
+   - Bueno (4): Analiza los fallos mínimos con la mayoría de columnas completas.
+   - Aceptable (3): Menciona fallos sin decir cómo se detectan, cómo se recupera el sistema o quién responde.
+   - Insuficiente (1): No analiza fallos.
+
+8. Quality Gates y Human-in-the-Loop — 8 puntos (competencia: IA responsable)
+   - Excelente (5): Dice qué nunca se automatiza, el nivel de autonomía por acción, los Quality Gates y cada riesgo cruzado con su Quality Gate.
+   - Bueno (4): Define Quality Gates y control humano, pero sin cruzarlos con los riesgos.
+   - Aceptable (3): Menciona la revisión humana de forma general, sin Quality Gates concretos.
+   - Insuficiente (1): La IA decide sola o no hay control humano.
+
+9. Uso responsable de IA y Banco de Prompts — 7 puntos (competencia: IA responsable)
+   - Excelente (5): Banco de prompts desde el inicio con las columnas de la guía, incluye prompts rechazados y una declaración de uso responsable completa.
+   - Bueno (4): Banco de prompts completo y declaración, pero sin prompts rechazados o con pocos registros.
+   - Aceptable (3): Banco de prompts con pocos registros o declaración genérica.
+   - Insuficiente (1): No hay banco de prompts ni declaración.
+
+10. Prototipo y defensa técnica — 5 puntos (competencia: Comunicación técnica)
+   - Excelente (5): Prototipo navegable con lo simulado rotulado y respuestas claras a las preguntas de defensa.
+   - Bueno (4): Prototipo funcional y defensa con respuestas a la mayoría de preguntas.
+   - Aceptable (3): Prototipo incompleto o defensa con respuestas vagas.
+   - Insuficiente (1): No hay prototipo ni defensa.

@@ -674,6 +674,75 @@ class Informe(Estricto):
     generado: datetime
 
 
+# ---------- Tablero del docente (D-24) ----------
+
+
+class ResumenTablero(Estricto):
+    """Cuántas entregas hay en cada paso del flujo. Cada entrega cuenta con su última evaluación."""
+
+    estudiantes: int
+    laboratorios: int
+    entregas: int
+    sin_evaluar: int
+    en_proceso: int
+    por_revisar: int
+    aprobadas: int
+    publicadas: int
+    promedio: float | None = Field(ge=NOTA_MINIMA, le=NOTA_MAXIMA, allow_inf_nan=False)
+
+
+class NivelCantidad(Estricto):
+    nivel: NivelDominio
+    cantidad: int
+
+
+class LaboratorioTablero(Estricto):
+    laboratorio_id: UUID
+    titulo: str
+    entregas: int
+    evaluadas: int
+    publicadas: int
+    promedio: float | None
+    nivel: NivelDominio | None
+
+
+class CriterioTablero(Estricto):
+    """Dominio promedio de un criterio (nivel final llevado a 0-5) en las evaluaciones aprobadas."""
+
+    laboratorio: str
+    criterio: str
+    promedio: float
+    nivel: NivelDominio
+    evaluaciones: int
+
+
+class AcuerdoIA(Estricto):
+    """En cuántos criterios el docente dejó el nivel que propuso la IA (aprobadas y publicadas)."""
+
+    criterios: int
+    iguales: int
+    cambiados: int
+    porcentaje: float | None
+
+
+class AlertasTablero(Estricto):
+    """Entre las evaluaciones que esperan revisión."""
+
+    inyeccion: int
+    citas_no_encontradas: int
+    revision_manual: int
+
+
+class Tablero(Estricto):
+    resumen: ResumenTablero
+    niveles: list[NivelCantidad]
+    laboratorios: list[LaboratorioTablero]
+    criterios_debiles: list[CriterioTablero]
+    acuerdo: AcuerdoIA
+    alertas: AlertasTablero
+    generado: datetime
+
+
 class NodoMapa(Estricto):
     id: str = Field(min_length=1)
     tipo: TipoNodo
