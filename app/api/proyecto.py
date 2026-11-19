@@ -68,11 +68,21 @@ PROYECTO = Proyecto(
             rol="Desarrollo y arquitectura",
             aporte="Lleva el desarrollo con Claude Code: backend, frontend, despliegue y pruebas",
         ),
-        MiembroEquipo(nombre="Santiago Arias Aguirre", rol="[…]", aporte="[…]"),
+        MiembroEquipo(
+            nombre="Santiago Arias Aguirre",
+            rol="QA y sustentación",
+            aporte=(
+                "Prueba el recorrido completo en producción con las cuentas de estudiante, docente y "
+                "administrador · Presenta el problema, la regla de oro y cómo construimos el proyecto"
+            ),
+        ),
         MiembroEquipo(
             nombre="Jerónimo Aristizabal",
-            rol="[…]",
-            aporte="Base del frontend en React (PR #16) · […]",
+            rol="Frontend y sustentación",
+            aporte=(
+                "Hizo la base del frontend en React (PR #16) · Presenta la revisión del docente y lo que "
+                "ve el estudiante"
+            ),
         ),
     ],
     repositorio="https://github.com/aospinas/asesor-pedagogico",
