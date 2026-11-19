@@ -239,6 +239,7 @@ PANTALLAS = {
     "bandeja",
     "revision",
     "tablero",
+    "mi-tablero",
     "laboratorios",
     "admin",
     "equipo",

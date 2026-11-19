@@ -60,6 +60,7 @@ si la ruta, el rol o los requisitos no coinciden.
 | `GET /api/informe/{estudiante_id}/pdf` | Descargar el informe en PDF | Estudiante (solo lo suyo y ya publicado), Docente | RF-16 |
 | `GET /api/mapa/{estudiante_id}` | Ver el mapa mental | Estudiante (solo lo suyo y ya publicado), Docente | RF-17 |
 | `GET /api/tablero` | Ver el tablero del curso con métricas reales | Docente | RF-14, RF-16 |
+| `GET /api/mi-tablero` | Ver mi tablero (solo lo publicado) | Estudiante | RF-16 |
 | `GET /api/config-ia` | Ver el proveedor y el modelo de IA | Administrador | RF-19 |
 | `PUT /api/config-ia` | Cambiar el proveedor y el modelo de IA | Administrador | RF-19 |
 | `POST /api/config-ia/probar` | Probar la conexión con la IA | Administrador | RF-19 |
