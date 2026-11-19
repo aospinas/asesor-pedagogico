@@ -1,5 +1,5 @@
 import { type FormEvent, useState } from "react";
-import { Navigate } from "react-router-dom";
+import { Link, Navigate } from "react-router-dom";
 import { ErrorApi, api, enviarJson, type Sesion } from "../api";
 import { Curvas } from "../componentes";
 
@@ -58,6 +58,9 @@ export default function Inicio({ sesion, alEntrar }: { sesion: Sesion | null; al
           {enviando ? "Entrando…" : "Entrar"}
         </button>
         <p className="ayuda">¿Olvidaste tu contraseña? Pídele una temporal al administrador.</p>
+        <p className="ayuda">
+          <Link to="/proyecto">Conoce el proyecto y el equipo</Link> · <Link to="/bitacora">Cómo usamos la IA</Link>
+        </p>
       </form>
     </section>
   );

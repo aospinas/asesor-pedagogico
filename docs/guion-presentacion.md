@@ -17,9 +17,9 @@ Idea que se repite en toda la presentación:
 
 | Parte | Quién | Tiempo |
 | --- | --- | --- |
-| 1. El problema y la regla de oro | Santiago | 1:30 |
-| 2. Demo: docente crea el laboratorio y la rúbrica | Andrés | 2:00 |
-| 3. Demo: estudiante entrega y la IA evalúa | Andrés | 2:30 |
+| 1. El problema y la regla de oro | Andres | 1:30 |
+| 2. Demo: docente crea el laboratorio y la rúbrica | Santiago | 2:00 |
+| 3. Demo: estudiante entrega y la IA evalúa | Santiago | 2:30 |
 | 4. Demo: el docente revisa, cambia y publica | Jerónimo | 2:00 |
 | 5. Demo: lo que ve el estudiante | Jerónimo | 1:30 |
 | 6. Cómo lo construimos y qué aprendimos | Santiago | 2:00 |
@@ -27,7 +27,7 @@ Idea que se repite en toda la presentación:
 
 ---
 
-## 1. El problema y la regla de oro (Santiago, 1:30)
+## 1. El problema y la regla de oro (Andres, 1:30)
 
 **Mostrar:** la página **Proyecto** (`/proyecto`).
 
@@ -39,7 +39,7 @@ Idea que se repite en toda la presentación:
 
 **Lo que vimos en clase:** esto es lo del Lab 01, *dónde está la IA y, sobre todo, dónde no*. La IA es una capacidad dentro del sistema, no el sistema.
 
-## 2. Docente: laboratorio y rúbrica (Andrés, 2:00)
+## 2. Docente: laboratorio y rúbrica (Santiago, 2:00)
 
 **Mostrar:** pestaña del docente → **Tablero** → **Laboratorios** → abrir el Lab 01.
 
@@ -52,7 +52,7 @@ Idea que se repite en toda la presentación:
 
 **Lo que vimos en clase:** *Quality Gate* antes de usar una salida de la IA, y control humano.
 
-## 3. Estudiante entrega y la IA evalúa (Andrés, 2:30)
+## 3. Estudiante entrega y la IA evalúa (Santiago, 2:30)
 
 **Mostrar:** pestaña de Santiago → **Mis entregas**.
 
